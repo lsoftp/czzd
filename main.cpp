@@ -18,6 +18,7 @@ int main(int argc,char* argv[])
 			printf("%x ",original[i]);
 		}
         printf("\n");
+        //this is a test
         printf("%d\n",len);
         printf("\n");
 
