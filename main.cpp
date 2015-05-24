@@ -21,12 +21,6 @@ int main(int argc,char* argv[])
         printf("%d\n",len);
         printf("\n");
 
-		toOriginalMsg2(com, 9,  original,&len );
-		for(int i = 0; i<len; i++) {
-			printf("%x ",original[i]);
-		}
-        printf("\n");
-        printf("%d\n",len);
         return 0;  
 }  
 
