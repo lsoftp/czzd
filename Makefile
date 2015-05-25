@@ -6,7 +6,7 @@ main:tcpclient.o main.o
 main.o:tcpclient.h main.cpp
 	$(CXX) -c main.cpp
 
-tcpclient.o:tcpclient.h tcpclient.cpp
+tcpclient.o: datastruct.h tcpclient.h tcpclient.cpp
 	$(CXX) -c tcpclient.cpp
 
 clean:

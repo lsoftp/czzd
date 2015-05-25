@@ -1,4 +1,5 @@
-#include "tcpclient.h"  
+#include "tcpclient.h"
+#include "datastruct.h"
   
 TcpClient::TcpClient()
 {  
@@ -27,10 +28,20 @@ if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {
                 return -1;  
         }  
   
-        printf("send message to server: \n");  
-        fgets(message,4096,stdin);  
-  
-        if( send( socket_fd,message,strlen(message),0 ) < 0 ) {  
+        //printf("send message to server: \n");
+        //fgets(message,4096,stdin);
+        unsigned char s[6] = {0x01,0x39,0x16,0x85,0x96,0x14};
+        Register r;
+        r.header.msgId = 0x0100;
+        r.header.property = 30;
+        memcpy(r.header.phoneNumber ,s ,6);
+        r.plateNumber="abcde";
+        unsigned char ori[1024],com[1024];
+        int len =r.toStream(ori);
+        int l;
+        len = addCheckCode(ori,len);
+        toComposedMSg(ori,len, com, &l);
+        if( send( socket_fd,com, l,0 ) < 0 ) {
                 printf("send message error\n");  
                 return -1;  
         }  
@@ -144,5 +155,16 @@ int TcpClient::toComposedMSg(unsigned char * original,int origlen, unsigned char
 	
 	*comlen = j;
 	return 0;
+}
+
+int TcpClient::addCheckCode(unsigned char * original, int len)
+{
+	unsigned char c= 0x00;
+	for(int i = 0;i<len; i++)
+	{
+		c= c ^original[i];
+	}
+	original[len] = c;
+	return len+1;
 }
 

@@ -22,6 +22,7 @@ public:
 		int open(char* server_ip,char* server_port);
 		int toOriginalMsg(unsigned char * composed,int comlen, unsigned char * original, int *origlen);
 		int toComposedMSg(unsigned char * original,int origlen, unsigned char * composed, int* comlen);
+		int addCheckCode(unsigned char * original , int len);
 };  
 
 
