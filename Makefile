@@ -1,7 +1,7 @@
 CXX=g++
 
 main:tcpclient.o main.o
-	$(CXX) -o main main.o tcpclient.o
+	$(CXX) -o main main.o tcpclient.o -lpthread
 
 main.o:tcpclient.h main.cpp
 	$(CXX) -c main.cpp
