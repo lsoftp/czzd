@@ -196,10 +196,26 @@ public:
 		j += 1;
 		memcpy(original + j, plateNumber.c_str(), plateNumber.length()+1);
 		j =  j + plateNumber.length()+1;
+		//return j;
 
 	}
 
 
+};
+
+class Authentication
+{
+public:
+	MsgHeader header; //0x0102
+	STRING code;
+	int toStream(unsigned char * original)
+	{
+		int j;
+		j = header.toStream(original);
+		memcpy(original+j, code.c_str(),code.length()+1);
+		j = j + code.length() + 1;
+		return j;
+	}
 };
 
 class RegisterAck

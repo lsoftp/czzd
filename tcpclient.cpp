@@ -6,17 +6,23 @@ list<Msg> TcpClient::msgList;
 pthread_mutex_t TcpClient::mutex;
 list<RecvStream> TcpClient::recvStreamList;
 pthread_mutex_t TcpClient::mutexRecvStream;
+list<WORD> TcpClient::serialNumberList;
+pthread_mutex_t TcpClient::mutexserialNumber;
 
 TcpClient::TcpClient()
 {  
 	pthread_mutex_init(&mutex,NULL);
 	pthread_mutex_init(&mutexRecvStream,NULL);
+	pthread_mutex_init(&mutexserialNumber,NULL);
 	m_timeout= 2500000;
 	m_resendtimes =3;
 }  
 
 TcpClient::~TcpClient()
 {
+	pthread_mutex_destroy(&mutex);
+	pthread_mutex_destroy(&mutexRecvStream);
+	pthread_mutex_destroy(&mutexserialNumber);
 
 }
 
@@ -110,7 +116,9 @@ void * TcpClient::sendRecv(void* arg)
 	        		 r = recvbuf.getDataFromBuf(recvstream.stream, &(recvstream.size));
 	        		 if(r)
 	        		 {
-
+	        			 pthread_mutex_lock(&mutexRecvStream);
+	        			 recvStreamList.push_front(recvstream);
+	        			 pthread_mutex_unlock(&mutexRecvStream);
 	        		 }
 	        	 }
 	         }
@@ -145,6 +153,62 @@ void * TcpClient::sendRecv(void* arg)
 	return NULL;
 }
 
+void * TcpClient::handleRecvMsg(void *arg)
+{
+	TcpClient *ptc = (TcpClient*)arg;
+	RecvStream *prs=NULL;
+	RecvStream rs;
+	int i;
+	//ptc->checkCode(rs.stream, rs.size);
+	while(1)
+	{
+		pthread_mutex_lock(&mutexRecvStream);
+		if(recvStreamList.size()>0)
+		{
+			prs =&(*recvStreamList.begin());
+			recvStreamList.pop_front();
+		}
+		pthread_mutex_unlock(&mutexRecvStream);
+		if (prs != NULL)
+		{
+			ptc->toOriginalMsg(prs->stream, prs->size, rs.stream, &rs.size);
+			i = ptc->checkCode(rs.stream, rs.size);
+		}
+
+//
+		if(i<0)
+		{
+			continue;
+		}
+		if(i==1)
+		{
+			//parse msg
+			MsgHeader header;
+			int j = header.fromStream(rs.stream);
+			switch(header.msgId)
+			{
+			case 0x8100: handleRegisterAck(&rs);break;
+			default:break;
+			}
+		}
+
+	}
+
+}
+
+void TcpClient::handleRegisterAck(RecvStream *prs)
+{
+	RegisterAck ra;
+	int j = ra.fromStream(prs->stream, prs->size);
+	WORD serialNumber = ra.header.msgSerialNumber;
+	pthread_mutex_lock(&mutexserialNumber);
+	serialNumberList.push_front(serialNumber);
+	pthread_mutex_unlock(&mutexserialNumber);
+
+
+
+
+}
 int TcpClient::open(char * server_ip, char * server_port)
 {
 if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {  
@@ -166,13 +230,19 @@ if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {
                 return -1;  
         }  
   
-        int ret = pthread_create(&threadHandler, NULL, TcpClient::sendRecv, this);
+        int ret = pthread_create(&sendRecvHandler, NULL, TcpClient::sendRecv, this);
         if(ret != 0)
         {
             return ret;
         }
-        printf("\nret:%d   threadid: %d\n",ret,threadHandler);
-        //pthread_join(threadHandler, NULL);
+        ret = pthread_create(&recvHandler, NULL, TcpClient::handleRecvMsg, this);
+        if(ret != 0)
+        {
+            return ret;
+        }
+
+        printf("\nret:%d   threadid: %d\n",ret,sendRecvHandler);
+        //pthread_join(sendRecvHandler, NULL);
         //printf("send message to server: \n");
         //fgets(message,4096,stdin);
         Msg msg;
@@ -181,11 +251,15 @@ if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {
         r.header.msgId = 0x0100;
         r.header.property = 31;
         memcpy(r.header.phoneNumber ,s ,6);
-        r.plateNumber="abcde";
+        r.plateNumber="ab";
         unsigned char ori[1024];
-        int len =r.toStream(ori);
+        int len;
+        printf("\nlen:%d   \n",len);
+        len = r.toStream(ori);
+        printf("\nlen:%d   \n",len);
         int l;
         len = addCheckCode(ori,len);
+
         toComposedMsg(ori,len, msg.stream, &(msg.len));
         msg.resendTimes=0;
         msg.msgSerialNumber = r.header.msgSerialNumber;
@@ -194,7 +268,8 @@ if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {
         pthread_mutex_lock(&mutex);
         msgList.push_front(msg);
         pthread_mutex_unlock(&mutex);
-        pthread_join(threadHandler, NULL);
+        pthread_join(sendRecvHandler, NULL);
+        pthread_join(recvHandler, NULL);
        close(socket_fd);  
        return 0;  
 }
@@ -316,4 +391,33 @@ int TcpClient::addCheckCode(unsigned char * original, int len)
 	original[len] = c;
 	return len+1;
 }
+
+int TcpClient::checkCode(unsigned char * original, int len)
+{
+	unsigned char c=0x00;
+	if(len<2)
+	{
+		return -2;
+	}
+	for(int i=0; i<len-1;i++)
+	{
+		c = c^original[i];
+	}
+	if(original[len-1] != c)
+	{
+		return -1;
+	}
+	else
+	{
+		return 1;
+	}
+}
+
+
+
+
+
+
+
+
 
