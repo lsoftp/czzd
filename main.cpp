@@ -17,7 +17,7 @@ int main(int argc,char* argv[])
 
 		unsigned char ori[6] = {0x30,0x7e,0x08,0x7d,0x55,0x7e};
 		unsigned char compo[15];
-		tc.toComposedMSg(ori, 6, compo, &len);
+		tc.toComposedMsg(ori, 6, compo, &len);
 		for(int i = 0; i<len; i++)
             printf("%02x ",compo[i]);
         printf("\n%d\n",len);

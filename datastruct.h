@@ -11,6 +11,18 @@
 #include <string>
 #include <string.h>
 #include <arpa/inet.h>
+#include <list>
+#include <unistd.h>
+#include <iostream>
+#include <sys/socket.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/times.h>
+#include <sys/time.h>
+#include <sys/select.h>
+#include "pthread.h"
 
 using namespace std;
 
@@ -19,6 +31,77 @@ typedef unsigned char BYTE;
 typedef unsigned short WORD;
 typedef unsigned int DWORD;
 typedef unsigned char BCD;
+
+struct Msg
+{
+	unsigned char stream[1024];
+	int len;
+	int resendTimes;
+	WORD msgSerialNumber;
+	int sendChars;
+	struct timeval sendTime;
+	bool complete;
+};
+
+struct RecvStream
+{
+	unsigned char stream[1560];
+	int size;
+};
+class RecvBuf
+{
+public:
+	unsigned char stream[1560];
+	int size;
+	RecvBuf()
+	{
+		size = 0;
+	}
+	int getDataFromBuf(unsigned char *buf, int *len)
+	{
+		int j,begin = -1,end=-1;
+		for (j=0;j<size;j++)
+		{
+			if (stream[j] == 0x7e)
+			{
+				if(begin == -1)
+				{
+					begin=j;
+				}
+				else
+				{
+					end=j;
+				}
+			}
+		}
+		if(end == -1) //not found end of the packet
+		{
+			memmove(stream, stream+begin, size - begin);
+			size = size -begin;
+			return -2;
+		}
+		if((size -end -1) >0)
+		{
+			memcpy(buf, stream+begin, end-begin +1);
+			memmove(stream, stream+end+1,size - end-1);
+			size = size -end -1;
+			*len = end -begin +1;
+			return *len;
+		}
+		else if ((size - end -1) == 0)
+		{
+			memcpy(buf, stream+begin, size-begin);
+			size=0;
+			*len = size -begin;
+			return *len;
+		}
+		else
+		{
+			*len = 0;
+			return -1;
+		}
+	}
+};
 
 struct MsgHeader
 {
@@ -54,12 +137,32 @@ struct MsgHeader
 		}
 		return j;
 	}
+	int fromStream(unsigned char * original)
+	{
+		int j =0;
+		msgId=ntohs(*(WORD*)(original+j));
+		j += 2;
+		property = ntohs(*(WORD *)(original+j));
+		j += 2;
+		memcpy(&phoneNumber,original+j,6);
+		j += 6;
+		msgSerialNumber = ntohs(*(WORD*)(original+j));
+		j += 2;
+		if(property & 0x2000)
+		{
+			packetCount = ntohs(*(WORD *)(original+j));
+			j += 2;
+			packetNo = ntohs(*(WORD*)(original+j));
+			j += 2;
+		}
+		return j;
+	}
 };
 
 class Register
 {
 public:
-	MsgHeader header;
+	MsgHeader header; //0x0100
 	WORD provinceId;
 	WORD cityId;
 	BYTE manufacturerId[5];
@@ -96,6 +199,30 @@ public:
 
 	}
 
+
+};
+
+class RegisterAck
+{
+public:
+	MsgHeader header; //0x8100
+	BYTE result;
+	STRING authenticationCode;
+
+	int fromStream(unsigned char* original, int len)
+	{
+		int j = 0;
+		j = header.fromStream(original);
+		result = *(original+j);
+		j += 1;
+		if(0 == result)
+		{
+			authenticationCode = (char*)original+j;
+			j = j + authenticationCode.length() + 1;
+		}
+		return j;
+
+	}
 
 };
 

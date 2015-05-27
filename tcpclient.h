@@ -1,35 +1,29 @@
 #ifndef _TCP_CLIENT_H_
 #define _TCP_CLIENT_H_
 
-#include <unistd.h>  
-#include <iostream>  
-#include <sys/socket.h>  
-#include <arpa/inet.h>  
-#include <errno.h>  
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/times.h>
-#include <sys/select.h>
-#include "pthread.h"
-
+#include "datastruct.h"
   
 class TcpClient  
 {  
 private:  
         int socket_fd;  
         pthread_t threadHandler;
+        int m_timeout; //usecond
+        int m_resendtimes; //max re send times
         char message[4096];  
-        struct sockaddr_in server_addr;  
+        struct sockaddr_in server_addr;
+        static list<Msg> msgList;
+        static pthread_mutex_t mutex;
+        static list<RecvStream> recvStreamList;
+        static pthread_mutex_t mutexRecvStream;
   
 public:  
         TcpClient();  
         virtual ~TcpClient();
-        static void * threadFunc(void* arg);
+        static void * sendRecv(void* arg);
 		int open(char* server_ip,char* server_port);
 		int toOriginalMsg(unsigned char * composed,int comlen, unsigned char * original, int *origlen);
-		int toComposedMSg(unsigned char * original,int origlen, unsigned char * composed, int* comlen);
+		int toComposedMsg(unsigned char * original,int origlen, unsigned char * composed, int* comlen);
 		int addCheckCode(unsigned char * original , int len);
 };  
 
