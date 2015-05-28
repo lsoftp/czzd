@@ -9,8 +9,8 @@ private:
         int socket_fd;  
         pthread_t sendRecvHandler;
         pthread_t recvHandler;
-        int m_timeout; //usecond
-        int m_resendtimes; //max re send times
+
+
         char message[4096];  
         struct sockaddr_in server_addr;
         static list<Msg> msgList;
@@ -21,7 +21,8 @@ private:
         static pthread_mutex_t mutexserialNumber;
         static WORD m_serialNumber;
         static BYTE m_phoneNumber[6];
-  
+        static int m_timeout; //usecond
+        static int m_resendtimes; //max re send times
 public:  
         TcpClient();  
         virtual ~TcpClient();
@@ -33,6 +34,8 @@ public:
 		static int toComposedMsg(unsigned char * original,int origlen, unsigned char * composed, int* comlen);
 		static int addCheckCode(unsigned char * original , int len);
 		static int checkCode(unsigned char * original, int len);
+		static Msg * getMsgToSend();
+		static int  handleMsgList();
 };  
 
 

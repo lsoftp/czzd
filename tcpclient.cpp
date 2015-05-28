@@ -10,13 +10,14 @@ list<WORD> TcpClient::serialNumberList;
 pthread_mutex_t TcpClient::mutexserialNumber;
 WORD TcpClient::m_serialNumber = 0;
 BYTE TcpClient::m_phoneNumber[6] = {0x01,0x39,0x16,0x85,0x96,0x14};
+int TcpClient::m_timeout = 2500000;
+int TcpClient::m_resendtimes = 3;
 TcpClient::TcpClient()
 {  
 	pthread_mutex_init(&mutex,NULL);
 	pthread_mutex_init(&mutexRecvStream,NULL);
 	pthread_mutex_init(&mutexserialNumber,NULL);
-	m_timeout= 2500000;
-	m_resendtimes =3;
+
 }  
 
 TcpClient::~TcpClient()
@@ -41,63 +42,19 @@ void * TcpClient::sendRecv(void* arg)
 
 	   while (1)
 	   {
-		   pthread_mutex_lock(&mutexserialNumber);
-		   if(serialNumberList.size()>0)
-		   {
-			   if(pmsg != NULL)
-			   {
-				   if (pmsg->msgSerialNumber == serialNumberList.front())
-				   {
-					   pmsg = NULL;
-				   }
-			   }
-		   }
-		   pthread_mutex_unlock(&mutexserialNumber);
+
+		 handleMsgList();
 
 
-		 gettimeofday(&endtime, NULL);
-		 if(pmsg != NULL)
+		 if(pmsg = NULL)
 		 {
-			 if(pmsg->complete == true)
-			 {
-				 long int time = (endtime.tv_sec - pmsg->sendTime.tv_sec)*1000000 + (endtime.tv_usec - pmsg->sendTime.tv_usec);
-				 if (time >= ptc->m_timeout)
-				 {
-					 if(pmsg->resendTimes < ptc->m_resendtimes)
-					 {
-						 pmsg->sendChars = 0;
-						 pmsg->complete = false;
-						 printf("pmsg->len:%d\n",pmsg->len);
-						 fflush(stdout);
-					 }
-					 else
-					 {
-						 pmsg = NULL;
-						 pthread_mutex_lock(&mutex);
-						 if(msgList.size() > 0)
-						 {
-							 if(pmsg == NULL)
-							 {
-								 msgList.pop_front();
-							 }
-							 //
-						 }
-						 pthread_mutex_unlock(&mutex);
-
-					 }
-				 }
-			 }
+			 pmsg = getMsgToSend();
 		 }
-		 pthread_mutex_lock(&mutex);
-		 if(msgList.size() > 0)
+		 else
 		 {
-			 if(pmsg == NULL)
-			 {
-				 pmsg = &(*msgList.begin());
-			 }
-			 //
+			 if(pmsg->complete)
+			 pmsg = getMsgToSend();
 		 }
-		 pthread_mutex_unlock(&mutex);
 
 	     FD_ZERO(&readset);            //每次循环都要清空集合，否则不能检测描述符变化
 	     FD_SET(sfd, &readset);     //添加描述符
@@ -129,7 +86,7 @@ void * TcpClient::sendRecv(void* arg)
 	        	     printf("recv message error\n");
 	        	 	 return NULL;
 	        	 }
-	        	 else if(recvChar == 0)
+	        	 else if(recvChars == 0)
 	        	 {
 	        		 //网络断开，尝试重连
 	        	 }
@@ -160,7 +117,7 @@ void * TcpClient::sendRecv(void* arg)
 	        			  pmsg->sendChars += sendChars;
 	        		  }
 	        	  }
-	        	  if((pmsg != NULL) && (pmsg->sendChars = pmsg->len)&&(!pmsg->complete))
+	        	  if((pmsg != NULL) && (pmsg->sendChars == pmsg->len)&&(!pmsg->complete))
 	        	  {
 	        		  (pmsg->resendTimes)++;
 	        		  gettimeofday(&(pmsg->sendTime),NULL);
@@ -252,11 +209,76 @@ void TcpClient::handleRegisterAck(RecvStream *prs)
 		pthread_mutex_unlock(&mutex);
 
 	}
-
-
-
-
 }
+
+Msg * TcpClient::getMsgToSend()
+{
+	Msg *pmsg=NULL;
+	struct timeval endtime;
+	gettimeofday(&endtime, NULL);
+	list<Msg>::iterator it;
+//	printf("sdfdfdsfdsf\n");
+	//fflush(stdout);
+	pthread_mutex_lock(&mutex);
+	for(it=msgList.begin(); it != msgList.end(); ++it)
+	{
+
+		pmsg = &(*it);
+		long int time = (endtime.tv_sec - pmsg->sendTime.tv_sec)*1000000 + (endtime.tv_usec - pmsg->sendTime.tv_usec);
+		if(!(pmsg->complete))
+		{
+			break;
+		}
+		else if(time >= m_timeout)
+		{
+			if(pmsg->resendTimes <m_resendtimes)
+			{
+				pmsg->sendChars = 0;
+				pmsg->complete = false;
+				break;
+			}
+
+		}
+	}
+	pthread_mutex_unlock(&mutex);
+	return pmsg;
+}
+int  TcpClient::handleMsgList()
+{
+	WORD sn;
+	Msg *pmsg = NULL;
+	list<WORD>::iterator it;
+	pthread_mutex_lock(&mutexserialNumber);
+	for(it = serialNumberList.begin(); it != serialNumberList.end(); )
+	{
+		sn = *it;
+		list<Msg>::iterator it1;
+		pthread_mutex_lock(&mutex);
+		for(it1 = msgList.begin(); it1 != msgList.end(); )
+		{
+			pmsg = &(*it1);
+
+
+			if((pmsg->msgSerialNumber = sn) ||(pmsg->resendTimes == m_resendtimes-1))
+			{
+				msgList.erase(it1++);
+				if(pmsg->resendTimes == m_resendtimes-1)
+				{
+					//save msg or other things
+				}
+
+			}
+			else
+			{
+				++it1;
+			}
+		}
+		pthread_mutex_unlock(&mutex);
+		serialNumberList.erase(it++);
+	}
+	pthread_mutex_unlock(&mutexserialNumber);
+}
+
 int TcpClient::open(char * server_ip, char * server_port)
 {
 if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {  
