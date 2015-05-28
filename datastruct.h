@@ -41,6 +41,12 @@ struct Msg
 	int sendChars;
 	struct timeval sendTime;
 	bool complete;
+	Msg()
+	{
+		resendTimes = 0;
+		complete = false;
+		sendChars = 0;
+	}
 };
 
 struct RecvStream
@@ -196,7 +202,7 @@ public:
 		j += 1;
 		memcpy(original + j, plateNumber.c_str(), plateNumber.length()+1);
 		j =  j + plateNumber.length()+1;
-		//return j;
+		return j;
 
 	}
 
@@ -208,6 +214,10 @@ class Authentication
 public:
 	MsgHeader header; //0x0102
 	STRING code;
+	Authentication()
+	{
+		header.msgId = 0x0102;
+	}
 	int toStream(unsigned char * original)
 	{
 		int j;

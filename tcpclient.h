@@ -19,6 +19,8 @@ private:
         static pthread_mutex_t mutexRecvStream;
         static list<WORD> serialNumberList;
         static pthread_mutex_t mutexserialNumber;
+        static WORD m_serialNumber;
+        static BYTE m_phoneNumber[6];
   
 public:  
         TcpClient();  
@@ -27,10 +29,10 @@ public:
         static void * handleRecvMsg(void *arg);
         static void handleRegisterAck(RecvStream *prs);
 		int open(char* server_ip,char* server_port);
-		int toOriginalMsg(unsigned char * composed,int comlen, unsigned char * original, int *origlen);
-		int toComposedMsg(unsigned char * original,int origlen, unsigned char * composed, int* comlen);
-		int addCheckCode(unsigned char * original , int len);
-		int checkCode(unsigned char * original, int len);
+		static int toOriginalMsg(unsigned char * composed,int comlen, unsigned char * original, int *origlen);
+		static int toComposedMsg(unsigned char * original,int origlen, unsigned char * composed, int* comlen);
+		static int addCheckCode(unsigned char * original , int len);
+		static int checkCode(unsigned char * original, int len);
 };  
 
 

@@ -8,7 +8,8 @@ list<RecvStream> TcpClient::recvStreamList;
 pthread_mutex_t TcpClient::mutexRecvStream;
 list<WORD> TcpClient::serialNumberList;
 pthread_mutex_t TcpClient::mutexserialNumber;
-
+WORD TcpClient::m_serialNumber = 0;
+BYTE TcpClient::m_phoneNumber[6] = {0x01,0x39,0x16,0x85,0x96,0x14};
 TcpClient::TcpClient()
 {  
 	pthread_mutex_init(&mutex,NULL);
@@ -40,6 +41,20 @@ void * TcpClient::sendRecv(void* arg)
 
 	   while (1)
 	   {
+		   pthread_mutex_lock(&mutexserialNumber);
+		   if(serialNumberList.size()>0)
+		   {
+			   if(pmsg != NULL)
+			   {
+				   if (pmsg->msgSerialNumber == serialNumberList.front())
+				   {
+					   pmsg = NULL;
+				   }
+			   }
+		   }
+		   pthread_mutex_unlock(&mutexserialNumber);
+
+
 		 gettimeofday(&endtime, NULL);
 		 if(pmsg != NULL)
 		 {
@@ -102,20 +117,28 @@ void * TcpClient::sendRecv(void* arg)
 
 	         break;
 	       default:
+
 	         if (FD_ISSET(sfd, &readset))  //测试sock是否可读，即是否网络上有数据
 	         {
+	        	 printf("recvstream len:%d\n", recvbuf.size);
+	    	   	 fflush(stdout);
 	        	 recvChars = recv(sfd, recvbuf.stream+recvbuf.size, 1560-recvbuf.size,0);
+
 	        	 if( recvChars < 0 )
 	        	 {
 	        	     printf("recv message error\n");
 	        	 	 return NULL;
 	        	 }
-	        	 else
+	        	 else if(recvChar == 0)
 	        	 {
+	        		 //网络断开，尝试重连
+	        	 }
+	        	 else{
 	        		 recvbuf.size += recvChars;
 	        		 r = recvbuf.getDataFromBuf(recvstream.stream, &(recvstream.size));
 	        		 if(r)
 	        		 {
+	        			 //printf("recvchars %d\n",recvChars);
 	        			 pthread_mutex_lock(&mutexRecvStream);
 	        			 recvStreamList.push_front(recvstream);
 	        			 pthread_mutex_unlock(&mutexRecvStream);
@@ -167,6 +190,8 @@ void * TcpClient::handleRecvMsg(void *arg)
 		{
 			prs =&(*recvStreamList.begin());
 			recvStreamList.pop_front();
+			printf("prs len:%d\n", prs->size);
+			fflush(stdout);
 		}
 		pthread_mutex_unlock(&mutexRecvStream);
 		if (prs != NULL)
@@ -204,6 +229,29 @@ void TcpClient::handleRegisterAck(RecvStream *prs)
 	pthread_mutex_lock(&mutexserialNumber);
 	serialNumberList.push_front(serialNumber);
 	pthread_mutex_unlock(&mutexserialNumber);
+
+	if(ra.result == 0)
+	{
+		Authentication au;
+		au.code = ra.authenticationCode;
+		au.header.property = 12+au.code.length() +1;
+		memcpy(au.header.phoneNumber, m_phoneNumber,6);
+		Msg msg;
+		unsigned char ori[1024];
+		int len;
+		len = au.toStream(ori);
+		len = addCheckCode(ori,len);
+
+		toComposedMsg(ori,len, msg.stream, &(msg.len));
+		msg.resendTimes=0;
+		msg.msgSerialNumber = au.header.msgSerialNumber;
+		msg.sendChars = 0;
+		msg.complete = false;
+		pthread_mutex_lock(&mutex);
+		msgList.push_front(msg);
+		pthread_mutex_unlock(&mutex);
+
+	}
 
 
 
@@ -251,7 +299,7 @@ if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {
         r.header.msgId = 0x0100;
         r.header.property = 31;
         memcpy(r.header.phoneNumber ,s ,6);
-        r.plateNumber="ab";
+        r.plateNumber="abcde";
         unsigned char ori[1024];
         int len;
         printf("\nlen:%d   \n",len);
