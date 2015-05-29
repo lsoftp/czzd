@@ -12,6 +12,7 @@ WORD TcpClient::m_serialNumber = 0;
 BYTE TcpClient::m_phoneNumber[6] = {0x01,0x39,0x16,0x85,0x96,0x14};
 int TcpClient::m_timeout = 2500000;
 int TcpClient::m_resendtimes = 3;
+
 TcpClient::TcpClient()
 {  
 	pthread_mutex_init(&mutex,NULL);
@@ -30,8 +31,8 @@ TcpClient::~TcpClient()
 
 void * TcpClient::sendRecv(void* arg)
 {
-		TcpClient *ptc = (TcpClient*)arg;
-		int sfd=ptc->socket_fd;
+	   TcpClient *ptc = (TcpClient*)arg;
+	   int sfd=ptc->socket_fd;
 	   fd_set readset, writeset;
 	   Msg *pmsg=NULL;
 	   RecvBuf recvbuf;
@@ -46,15 +47,11 @@ void * TcpClient::sendRecv(void* arg)
 		 handleMsgList();
 
 
-		 if(pmsg = NULL)
+		 if(pmsg == NULL)
 		 {
 			 pmsg = getMsgToSend();
 		 }
-		 else
-		 {
-			 if(pmsg->complete)
-			 pmsg = getMsgToSend();
-		 }
+
 
 	     FD_ZERO(&readset);            //每次循环都要清空集合，否则不能检测描述符变化
 	     FD_SET(sfd, &readset);     //添加描述符
@@ -122,6 +119,7 @@ void * TcpClient::sendRecv(void* arg)
 	        		  (pmsg->resendTimes)++;
 	        		  gettimeofday(&(pmsg->sendTime),NULL);
 	        		  pmsg->complete = true;
+	        		  pmsg = NULL;
 	        	  }
 	         }
 
@@ -213,7 +211,7 @@ void TcpClient::handleRegisterAck(RecvStream *prs)
 
 Msg * TcpClient::getMsgToSend()
 {
-	Msg *pmsg=NULL;
+	Msg *pmsg=NULL, *pmsg1 = NULL;
 	struct timeval endtime;
 	gettimeofday(&endtime, NULL);
 	list<Msg>::iterator it;
@@ -227,21 +225,23 @@ Msg * TcpClient::getMsgToSend()
 		long int time = (endtime.tv_sec - pmsg->sendTime.tv_sec)*1000000 + (endtime.tv_usec - pmsg->sendTime.tv_usec);
 		if(!(pmsg->complete))
 		{
+			pmsg1 = pmsg;
 			break;
 		}
-		else if(time >= m_timeout)
+		else if((time >= m_timeout) &&!(pmsg->isAck))
 		{
 			if(pmsg->resendTimes <m_resendtimes)
 			{
 				pmsg->sendChars = 0;
 				pmsg->complete = false;
+				pmsg1 = pmsg;
 				break;
 			}
 
 		}
 	}
 	pthread_mutex_unlock(&mutex);
-	return pmsg;
+	return pmsg1;
 }
 int  TcpClient::handleMsgList()
 {
@@ -259,10 +259,10 @@ int  TcpClient::handleMsgList()
 			pmsg = &(*it1);
 
 
-			if((pmsg->msgSerialNumber = sn) ||(pmsg->resendTimes == m_resendtimes-1))
+			if((pmsg->complete)&&((pmsg->msgSerialNumber == sn) ||(pmsg->resendTimes >= m_resendtimes)||(pmsg->isAck)))
 			{
 				msgList.erase(it1++);
-				if(pmsg->resendTimes == m_resendtimes-1)
+				if(pmsg->resendTimes >= m_resendtimes)
 				{
 					//save msg or other things
 				}

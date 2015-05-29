@@ -41,8 +41,10 @@ struct Msg
 	int sendChars;
 	struct timeval sendTime;
 	bool complete;
+	bool isAck;
 	Msg()
 	{
+		isAck = false;
 		resendTimes = 0;
 		complete = false;
 		sendChars = 0;
