@@ -5,14 +5,30 @@
   
 class TcpClient  
 {  
+
+public:
+        TcpClient();
+        virtual ~TcpClient();
+        int start();
+        static void * sendRecv(void* arg);
+        static void * handleRecvMsg(void *arg);
+        static void handleRegisterAck(RecvStream *prs);
+		static int open(char* server_ip,char* server_port);
+		static int toOriginalMsg(unsigned char * composed,int comlen, unsigned char * original, int *origlen);
+		static int toComposedMsg(unsigned char * original,int origlen, unsigned char * composed, int* comlen);
+		static int addCheckCode(unsigned char * original , int len);
+		static int checkCode(unsigned char * original, int len);
+		static Msg * getMsgToSend();
+		static int  handleMsgList();
+		static void setTime(BCD (&bcd)[6]);
 private:  
-        int socket_fd;  
+        static int socket_fd;
         pthread_t sendRecvHandler;
         pthread_t recvHandler;
 
 
-        char message[4096];  
-        struct sockaddr_in server_addr;
+
+        static struct sockaddr_in server_addr;
         static list<Msg> msgList;
         static pthread_mutex_t mutex;
         static list<RecvStream> recvStreamList;
@@ -23,19 +39,7 @@ private:
         static BYTE m_phoneNumber[6];
         static int m_timeout; //usecond
         static int m_resendtimes; //max re send times
-public:  
-        TcpClient();  
-        virtual ~TcpClient();
-        static void * sendRecv(void* arg);
-        static void * handleRecvMsg(void *arg);
-        static void handleRegisterAck(RecvStream *prs);
-		int open(char* server_ip,char* server_port);
-		static int toOriginalMsg(unsigned char * composed,int comlen, unsigned char * original, int *origlen);
-		static int toComposedMsg(unsigned char * original,int origlen, unsigned char * composed, int* comlen);
-		static int addCheckCode(unsigned char * original , int len);
-		static int checkCode(unsigned char * original, int len);
-		static Msg * getMsgToSend();
-		static int  handleMsgList();
+        static RecvBuf recvbuf;
 };  
 
 

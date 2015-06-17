@@ -12,6 +12,9 @@ WORD TcpClient::m_serialNumber = 0;
 BYTE TcpClient::m_phoneNumber[6] = {0x01,0x39,0x16,0x85,0x96,0x14};
 int TcpClient::m_timeout = 2500000;
 int TcpClient::m_resendtimes = 3;
+int TcpClient::socket_fd;
+struct sockaddr_in TcpClient::server_addr;
+RecvBuf TcpClient::recvbuf;
 
 TcpClient::TcpClient()
 {  
@@ -32,10 +35,12 @@ TcpClient::~TcpClient()
 void * TcpClient::sendRecv(void* arg)
 {
 	   TcpClient *ptc = (TcpClient*)arg;
+	   int ret1 =open("127.0.0.1","8899");
+	   if(ret1 != 0) return NULL;
 	   int sfd=ptc->socket_fd;
 	   fd_set readset, writeset;
 	   Msg *pmsg=NULL;
-	   RecvBuf recvbuf;
+
 	   RecvStream recvstream;
 	   struct timeval timeout={0,200},endtime;
 	   int maxfd;
@@ -76,6 +81,7 @@ void * TcpClient::sendRecv(void* arg)
 	         {
 	        	 printf("recvstream len:%d\n", recvbuf.size);
 	    	   	 fflush(stdout);
+	    	   	 pthread_mutex_lock(&mutexRecvStream);
 	        	 recvChars = recv(sfd, recvbuf.stream+recvbuf.size, 1560-recvbuf.size,0);
 
 	        	 if( recvChars < 0 )
@@ -89,15 +95,9 @@ void * TcpClient::sendRecv(void* arg)
 	        	 }
 	        	 else{
 	        		 recvbuf.size += recvChars;
-	        		 r = recvbuf.getDataFromBuf(recvstream.stream, &(recvstream.size));
-	        		 if(r)
-	        		 {
-	        			 //printf("recvchars %d\n",recvChars);
-	        			 pthread_mutex_lock(&mutexRecvStream);
-	        			 recvStreamList.push_front(recvstream);
-	        			 pthread_mutex_unlock(&mutexRecvStream);
-	        		 }
+
 	        	 }
+	        	 pthread_mutex_unlock(&mutexRecvStream);
 	         }
 	          if (FD_ISSET(sfd, &writeset))
 	         {
@@ -134,43 +134,49 @@ void * TcpClient::sendRecv(void* arg)
 void * TcpClient::handleRecvMsg(void *arg)
 {
 	TcpClient *ptc = (TcpClient*)arg;
-	RecvStream *prs=NULL;
-	RecvStream rs;
-	int i;
-	//ptc->checkCode(rs.stream, rs.size);
+	RecvStream recvstream,rs;
+	int i,r = 0;
+
 	while(1)
 	{
 		pthread_mutex_lock(&mutexRecvStream);
-		if(recvStreamList.size()>0)
+		if(recvbuf.size >0)
 		{
-			prs =&(*recvStreamList.begin());
-			recvStreamList.pop_front();
-			printf("prs len:%d\n", prs->size);
-			fflush(stdout);
-		}
-		pthread_mutex_unlock(&mutexRecvStream);
-		if (prs != NULL)
-		{
-			ptc->toOriginalMsg(prs->stream, prs->size, rs.stream, &rs.size);
-			i = ptc->checkCode(rs.stream, rs.size);
+			r = recvbuf.getDataFromBuf(recvstream.stream, &(recvstream.size));
 		}
 
-//
-		if(i<0)
-		{
-			continue;
-		}
-		if(i==1)
-		{
-			//parse msg
-			MsgHeader header;
-			int j = header.fromStream(rs.stream);
-			switch(header.msgId)
+		pthread_mutex_unlock(&mutexRecvStream);
+		 if(r)
+		 {
+			 for(int t=0; t<recvstream.size;t++)
+			                 printf("%02x ", recvstream.stream[t]);
+			             printf("\n");
+			 ptc->toOriginalMsg(recvstream.stream, recvstream.size, rs.stream, &rs.size);
+			i = ptc->checkCode(rs.stream, rs.size);
+			if(i<0)
 			{
-			case 0x8100: handleRegisterAck(&rs);break;
-			default:break;
+				continue;
 			}
-		}
+			if(i==1)
+			{
+			//parse msg
+				MsgHeader header;
+				int j = header.fromStream(rs.stream);
+				switch(header.msgId)
+				{
+					case 0x8100: handleRegisterAck(&rs);break;
+					default:break;
+				}
+			}
+			r=0;
+		 }
+
+
+
+
+
+//
+
 
 	}
 
@@ -180,7 +186,8 @@ void TcpClient::handleRegisterAck(RecvStream *prs)
 {
 	RegisterAck ra;
 	int j = ra.fromStream(prs->stream, prs->size);
-	WORD serialNumber = ra.header.msgSerialNumber;
+	WORD serialNumber = ra.sn;
+	cout<<"sn:"<<ra.sn<<endl;
 	pthread_mutex_lock(&mutexserialNumber);
 	serialNumberList.push_front(serialNumber);
 	pthread_mutex_unlock(&mutexserialNumber);
@@ -278,12 +285,72 @@ int  TcpClient::handleMsgList()
 	}
 	pthread_mutex_unlock(&mutexserialNumber);
 }
+int TcpClient::start()
+{
+    int ret = pthread_create(&sendRecvHandler, NULL, TcpClient::sendRecv, this);
+    if(ret != 0)
+    {
+        return ret;
+    }
+    ret = pthread_create(&recvHandler, NULL, TcpClient::handleRecvMsg, this);
+    if(ret != 0)
+    {
+        return ret;
+    }
+    unsigned char s[6] = {0x01,0x39,0x34,0x34,0x36,0x44};
+    unsigned char ori[1024];
+    PositionReport pr;
+    setTime(pr.time);
+    pr.header.msgId = 0x0200;
+    pr.header.property = 28;
+    pr.header.msgSerialNumber =222;
+    memcpy(pr.header.phoneNumber ,s ,6);
+    pr.speed = 18;
+    pr.latitude =333000;
+    pr.longitude = 567890;
+    pr.altitude = 300;
+    pr.direction=256;
+    pr.status =0x7897;
+    pr.warningMark =0;
+    Msg msg;
 
+	Register r;
+	r.header.msgId = 0x0100;
+	r.header.property = 31;
+	r.header.msgSerialNumber =333;
+	memcpy(r.header.phoneNumber ,s ,6);
+	r.plateNumber="abcde";
+
+	int len;
+	printf("\nlen:%d   \n",len);
+	len = r.toStream(ori);
+	printf("\nlen:%d   \n",len);
+	int l;
+	len = addCheckCode(ori,len);
+
+	toComposedMsg(ori,len, msg.stream, &(msg.len));
+	msg.resendTimes=0;
+	msg.msgSerialNumber = r.header.msgSerialNumber;
+	msg.sendChars = 0;
+	msg.complete = false;
+	pthread_mutex_lock(&mutex);
+	msgList.push_front(msg);
+	pthread_mutex_unlock(&mutex);
+	len=pr.toStream(ori);
+	len = addCheckCode(ori,len);
+	toComposedMsg(ori,len,msg.stream, &(msg.len));
+	msg.msgSerialNumber = pr.header.msgSerialNumber;
+	pthread_mutex_lock(&mutex);
+	msgList.push_front(msg);
+	pthread_mutex_unlock(&mutex);
+    pthread_join(sendRecvHandler, NULL);
+    pthread_join(recvHandler, NULL);
+}
 int TcpClient::open(char * server_ip, char * server_port)
 {
-if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {  
+		if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {
                printf("create socket error: %s(errno:%d)\n)",strerror(errno),errno);  
-               return -1;  
+               return -1;
         }  
   
         memset(&server_addr,0,sizeof(server_addr));  
@@ -300,47 +367,10 @@ if( (socket_fd = socket(AF_INET,SOCK_STREAM,0)) < 0 ) {
                 return -1;  
         }  
   
-        int ret = pthread_create(&sendRecvHandler, NULL, TcpClient::sendRecv, this);
-        if(ret != 0)
-        {
-            return ret;
-        }
-        ret = pthread_create(&recvHandler, NULL, TcpClient::handleRecvMsg, this);
-        if(ret != 0)
-        {
-            return ret;
-        }
 
-        printf("\nret:%d   threadid: %d\n",ret,sendRecvHandler);
-        //pthread_join(sendRecvHandler, NULL);
-        //printf("send message to server: \n");
-        //fgets(message,4096,stdin);
-        Msg msg;
-        unsigned char s[6] = {0x01,0x39,0x16,0x85,0x96,0x14};
-        Register r;
-        r.header.msgId = 0x0100;
-        r.header.property = 31;
-        memcpy(r.header.phoneNumber ,s ,6);
-        r.plateNumber="abcde";
-        unsigned char ori[1024];
-        int len;
-        printf("\nlen:%d   \n",len);
-        len = r.toStream(ori);
-        printf("\nlen:%d   \n",len);
-        int l;
-        len = addCheckCode(ori,len);
 
-        toComposedMsg(ori,len, msg.stream, &(msg.len));
-        msg.resendTimes=0;
-        msg.msgSerialNumber = r.header.msgSerialNumber;
-        msg.sendChars = 0;
-        msg.complete = false;
-        pthread_mutex_lock(&mutex);
-        msgList.push_front(msg);
-        pthread_mutex_unlock(&mutex);
-        pthread_join(sendRecvHandler, NULL);
-        pthread_join(recvHandler, NULL);
-       close(socket_fd);  
+
+
        return 0;  
 }
 int TcpClient::toOriginalMsg(unsigned char * composed,int comlen, unsigned char * original, int *origlen)
@@ -484,7 +514,20 @@ int TcpClient::checkCode(unsigned char * original, int len)
 }
 
 
+void TcpClient::setTime(BCD (&bcd)[6])
+{
+	time_t timer;
+	struct tm *tblock;
+	timer=time(NULL);
+	tblock=localtime(&timer);
+	bcd[0] = (unsigned int)((tblock->tm_year-100)/10)<<4|(unsigned int)((tblock->tm_year-100)%10);
+	bcd[1] = (unsigned int)((tblock->tm_mon+1)/10)<<4 | (unsigned int)((tblock->tm_mon+1)%10);
+	bcd[2] = (unsigned int)(tblock->tm_mday/10)<<4 | (unsigned int)((tblock->tm_mday)%10);
+	bcd[3] = (unsigned int)(tblock->tm_hour/10)<<4 | (unsigned int)((tblock->tm_hour)%10);
+	bcd[4] = (unsigned int)(tblock->tm_min/10)<<4 | (unsigned int)((tblock->tm_min)%10);
+	bcd[5] = (unsigned int)(tblock->tm_sec/10)<<4 | (unsigned int)((tblock->tm_sec)%10);
 
+}
 
 
 

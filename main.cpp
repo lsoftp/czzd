@@ -9,7 +9,9 @@ int main(int argc,char* argv[])
 		int len =0;
 		unsigned char original[11];
         TcpClient tc;  
-        tc.open("192.168.10.83","8899");
+       // tc.open("192.168.10.83","8899");
+
+        tc.start();
 		tc.toOriginalMsg(com, 11,  original,&len );
 		for(int i = 0; i<len; i++)
             printf("%02x ",original[i]);
