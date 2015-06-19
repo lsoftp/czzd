@@ -13,6 +13,7 @@ public:
         static void * sendRecv(void* arg);
         static void * handleRecvMsg(void *arg);
         static void handleRegisterAck(RecvStream *prs);
+        static void handlePlatformAck(RecvStream *prs);
 		static int open(char* server_ip,char* server_port);
 		static int toOriginalMsg(unsigned char * composed,int comlen, unsigned char * original, int *origlen);
 		static int toComposedMsg(unsigned char * original,int origlen, unsigned char * composed, int* comlen);

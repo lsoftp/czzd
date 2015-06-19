@@ -1,42 +1,27 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
-#include "datestruct.h"
+#include "datastruct.h"
 #include <string>
 #include <map>
-
-
-using namespace std;
-
-
-
 #define COMMENT_CHAR '#'
 
-
+class Param
+{
+public:
+	DWORD id;
+	string value;
+	Param(DWORD i, string s);
+	Param(){};
+};
 
 class Config
 {
 public:
 	Config();
-private:
- 	DWORD heartBeat;
-	DWORD tcpTimeout; 
-	DWORD tcpResendTimes;
-	DWORD udpTimeout;
-	DWORD udpResendTimes;
-	DWORD smsTimeout;
-	DWORD smsResendTimes;
-	STRING  APN;
-	STRING serverUser;
-	STRING serverPasswd;
-	STRING serverAddress;
-	STRING backupAPN;
-	STRING backupServerUser;
-	STRING backupServerPasswd;
-	STRING backupServerAddress;
-	DWORD tcpPort;
-	DWORD udpPort;
-	
 
+
+	
+	map<string, Param> m_paramlist;
 };
 #endif
 

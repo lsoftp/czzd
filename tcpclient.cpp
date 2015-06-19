@@ -34,6 +34,7 @@ TcpClient::~TcpClient()
 
 void * TcpClient::sendRecv(void* arg)
 {
+		pthread_detach(pthread_self());
 	   TcpClient *ptc = (TcpClient*)arg;
 	   int ret1 =open("127.0.0.1","8899");
 	   if(ret1 != 0) return NULL;
@@ -133,6 +134,7 @@ void * TcpClient::sendRecv(void* arg)
 
 void * TcpClient::handleRecvMsg(void *arg)
 {
+	pthread_detach(pthread_self());
 	TcpClient *ptc = (TcpClient*)arg;
 	RecvStream recvstream,rs;
 	int i,r = 0;
@@ -165,23 +167,27 @@ void * TcpClient::handleRecvMsg(void *arg)
 				switch(header.msgId)
 				{
 					case 0x8100: handleRegisterAck(&rs);break;
+					case 0x8001: handlePlatformAck(&rs);break;
 					default:break;
 				}
 			}
 			r=0;
 		 }
-
-
-
-
-
-//
-
-
 	}
 
 }
 
+void TcpClient::handlePlatformAck(RecvStream *prs)
+{
+	PlatformAck pa;
+	int j= pa.fromStream(prs->stream);
+	WORD serialNumber = pa.serialNumber;
+	cout<<"sn:"<<pa.serialNumber<<endl;
+	pthread_mutex_lock(&mutexserialNumber);
+	serialNumberList.push_front(serialNumber);
+	pthread_mutex_unlock(&mutexserialNumber);
+
+}
 void TcpClient::handleRegisterAck(RecvStream *prs)
 {
 	RegisterAck ra;
@@ -343,8 +349,7 @@ int TcpClient::start()
 	pthread_mutex_lock(&mutex);
 	msgList.push_front(msg);
 	pthread_mutex_unlock(&mutex);
-    pthread_join(sendRecvHandler, NULL);
-    pthread_join(recvHandler, NULL);
+
 }
 int TcpClient::open(char * server_ip, char * server_port)
 {

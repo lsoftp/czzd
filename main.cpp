@@ -1,6 +1,6 @@
 #include <iostream>  
 #include "tcpclient.h"
-  
+#include "config.h"
 using namespace std;  
   
 int main(int argc,char* argv[])  
@@ -10,7 +10,8 @@ int main(int argc,char* argv[])
 		unsigned char original[11];
         TcpClient tc;  
        // tc.open("192.168.10.83","8899");
-
+        Config cg;
+        //cout<<"id "<<cg.m_paramlist["heartBeat"].id<<"value "<<cg.m_paramlist["heartBeat"].value<<endl;
         tc.start();
 		tc.toOriginalMsg(com, 11,  original,&len );
 		for(int i = 0; i<len; i++)
@@ -23,6 +24,7 @@ int main(int argc,char* argv[])
 		for(int i = 0; i<len; i++)
             printf("%02x ",compo[i]);
         printf("\n%d\n",len);
+        for(;;);
         return 0;  
 }  
 
