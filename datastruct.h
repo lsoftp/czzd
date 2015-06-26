@@ -24,17 +24,16 @@
 #include <sys/select.h>
 #include <exception>
 #include <stdexcept>
+#include <vector>
 #include "pthread.h"
+#include "datatype.h"
+#include "config.h"
 
 #define BUFFER_SIZE 1560
 
 using namespace std;
 
-typedef string STRING;
-typedef unsigned char BYTE;
-typedef unsigned short WORD;
-typedef unsigned int DWORD;
-typedef unsigned char BCD;
+
 
 struct Msg
 {
@@ -240,6 +239,17 @@ public:
 
 };
 
+class HeartBeat
+{
+public:
+	MsgHeader header;//0x0002
+	HeartBeat()
+	{
+		header.msgId = 0x0002;
+		header.property = 0;
+	}
+};
+
 class Register
 {
 public:
@@ -254,7 +264,7 @@ public:
 
 	Register()
 	{
-
+		header.msgId = 0x0100;
 	}
 	int toStream(unsigned char * original)
 	{
@@ -283,6 +293,19 @@ public:
 
 
 };
+
+class Unregister
+{
+public:
+	MsgHeader header; //0x0003
+
+	Unregister()
+	{
+		header.msgId = 0x0003;
+		header.property = 0;
+	}
+};
+
 
 class Authentication
 {
@@ -330,6 +353,92 @@ public:
 
 };
 
+
+class SetParam
+{
+	union ParamValue
+	{
+		DWORD dw;
+		WORD w;
+		BYTE b;
+	};
+	struct Param
+	{
+		DWORD id;
+		ParamValue value;
+	};
+	struct StringParam
+	{
+		DWORD id;
+		STRING value;
+	};
+public:
+	MsgHeader header;//0x8103
+	BYTE count;
+
+	SetParam();
+	int fromStream(unsigned char *ori)
+	{
+		int j = 0;
+		j = header.fromStream(ori);
+		count = *(ori+j);
+		j += 1;
+		return j;
+	}
+
+	int getParam(unsigned char* ori);
+	static vector<Param> paramList;
+	static vector<StringParam> stringparamlist;
+};
+
+class QueryParam
+{
+public:
+	MsgHeader header;//0x8104
+};
+
+class QueryParamAck
+{
+public:
+	MsgHeader header;//0x0104
+	WORD sn;
+	BYTE count;
+};
+
+class TerminalControl
+{
+	enum CMD
+	{
+		wirelessUpdate = 1,
+		connectServer =2,
+		terminalShutdown =3,
+		terminalReset = 4,
+		restoreDefaultSetting =5,
+		closeDataCommunication =6,
+		closeWirelessCommunication =7
+	};
+public:
+	MsgHeader header;//0x8105
+	BYTE cmd;
+	STRING param;
+
+	int fromStream(unsigned char * ori, int size);
+
+	BYTE connectControl;
+	STRING APN;
+	STRING user;
+	STRING password;
+	STRING address;
+	WORD tcpPort;
+	WORD udpPort;
+	BYTE manufacturerId[5];
+	STRING authenticationCode;
+	STRING hardwareVersion;
+	STRING firmwareVersion;
+	STRING URL;
+	WORD connectTimeLimit;
+};
+
 class PositionReport
 {
 public:
@@ -344,48 +453,58 @@ public:
 	BCD time[6];
 
 	//status
-	const static DWORD acc = 0x00000001;
-	const static DWORD location = 0x00000002;
-	const static DWORD south  = 0x00000004;
-	const static DWORD west = 0x00000008;
-	const static DWORD outage = 0x00000010;
-	const static DWORD encryption = 0x00000020;
-	const static DWORD oidDisconnect = 0x00000400;
-	const static DWORD circuitDisconnect = 0x00000800;
-	const static DWORD lock =0x00001000;
+	enum
+	{
+		acc = 0x00000001,
+		location = 0x00000002,
+		south  = 0x00000004,
+		west = 0x00000008,
+		outage = 0x00000010,
+		encryption = 0x00000020,
+		oilDisconnect = 0x00000400,
+		circuitDisconnect = 0x00000800,
+		lock =0x00001000,
+	};
 
 	//warning mark
-	const static DWORD alarmSwitch = 0x00000001;
-	const static DWORD overspeed = 0x00000002;
-	const static DWORD fatigueDriving = 0x00000004;
-	const static DWORD forewarning = 0x00000008;
-	const static DWORD GNSSModuleFailure = 0x00000010;
-	const static DWORD GNSSAntennaOffline = 0x00000020;
-	const static DWORD GNSSAntennaShortout = 0x00000040;
-	const static DWORD undervoltage = 0x00000080;
-	const static DWORD powerFailure = 0x00000100;
-	const static DWORD displayFault = 0x00000200;
-	const static DWORD TTSFailure = 0x00000400;
-	const static DWORD cameraFailure = 0x00000800;
-	const static DWORD drivingTimeout = 0x00040000;
-	const static DWORD parkingTimeout = 0x00080000;
-	const static DWORD inOutArea = 0x00100000;
-	const static DWORD inOutLine = 0x00200000;
-	const static DWORD drivingTimeShortOrTooLong = 0x00400000;
-	const static DWORD lineDeparture = 0x00800000;
-	const static DWORD VSSFailure = 0x01000000;
-	const static DWORD abnormalOil = 0x02000000;
-	const static DWORD stolen = 0x04000000;
-	const static DWORD illegalIgnition = 0x08000000;
-	const static DWORD illegalDisplacement = 0x10000000;
+	enum
+	{
+		alarmSwitch = 0x00000001,
+		overspeed = 0x00000002,
+		fatigueDriving = 0x00000004,
+		forewarning = 0x00000008,
+		GNSSModuleFailure = 0x00000010,
+		GNSSAntennaOffline = 0x00000020,
+		GNSSAntennaShortout = 0x00000040,
+		undervoltage = 0x00000080,
+		powerFailure = 0x00000100,
+		displayFault = 0x00000200,
+		TTSFailure = 0x00000400,
+		cameraFailure = 0x00000800,
+		drivingTimeout = 0x00040000,
+		parkingTimeout = 0x00080000,
+		inOutArea = 0x00100000,
+		inOutLine = 0x00200000,
+		drivingTimeShortOrTooLong = 0x00400000,
+		lineDeparture = 0x00800000,
+		VSSFailure = 0x01000000,
+		abnormalOil = 0x02000000,
+		stolen = 0x04000000,
+		illegalIgnition = 0x08000000,
+		illegalDisplacement = 0x10000000,
+	};
+
 
 	//additional info id
-	const static BYTE mileage = 0x01;
-	const static BYTE oilMass = 0x02;
-	const static BYTE recordSpeed = 0x03;
-	const static BYTE overspeedAlarm = 0x11;
-	const static BYTE inOutAlarm = 0x12;
-	const static BYTE timeShortOrTooLong = 0x13;
+	enum
+	{
+		mileage = 0x01,
+		oilMass = 0x02,
+		recordSpeed = 0x03,
+		overspeedAlarm = 0x11,
+		inOutAlarm = 0x12,
+		timeShortOrTooLong = 0x13,
+	};
 
 	struct OverspeedInfo
 	{
