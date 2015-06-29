@@ -29,6 +29,7 @@
 #include "datatype.h"
 #include "config.h"
 
+#define PROPERTY_LENGTH 0x03ff;
 #define BUFFER_SIZE 1560
 
 using namespace std;
@@ -558,5 +559,360 @@ public:
 		return j;
 	}
 
+};
+
+class PositionQuery
+{
+public:
+	MsgHeader header;//0x8201
+};
+
+class PositionQueryAck
+{
+public:
+	MsgHeader header;//0x0201
+	WORD sn;
+	DWORD warningMark;
+	DWORD status;
+	DWORD latitude;
+	DWORD longitude;
+	WORD altitude;
+	WORD speed;
+	WORD direction;
+	BCD time[6];
+
+	int toStream(unsigned char * original)
+	{
+		int j;
+		j = header.toStream(original);
+		WORD tmp;
+		tmp = htons(sn);
+		memcpy(original+j, &tmp, sizeof(tmp));
+		j += 2;
+		DWORD dw = htonl(warningMark);
+		memcpy(original+j, &dw, sizeof(dw));
+		j += 4;
+		dw = htonl(status);
+		memcpy(original+j, &dw, sizeof(dw));
+		j += 4;
+		dw = htonl(latitude);
+		memcpy(original+j, &dw, sizeof(dw));
+		j += 4;
+		dw = htonl(longitude);
+		memcpy(original+j, &dw, sizeof(dw));
+		j += 4;
+		tmp= htons(altitude);
+		memcpy(original+j,&tmp, sizeof(tmp));
+		j += 2;
+		tmp = htons(speed);
+		memcpy(original+j,&tmp, sizeof(tmp));
+		j += 2;
+		tmp = htons(direction);
+		memcpy(original+j,&tmp, sizeof(tmp));
+		j += 2;
+		memcpy(original+j,time,6);
+		j += 6;
+
+
+		return j;
+	}
+
+};
+
+class TemporaryPositionTrack
+{
+public:
+	MsgHeader header; //0x8202
+	WORD interval;
+	DWORD validUntil;
+
+	int fromStream(unsigned char * ori);
+};
+
+class TextInfo
+{
+public:
+	MsgHeader header; //0x8300
+	BYTE mark;
+	STRING text;
+	enum
+	{
+		urgent = 0x01,
+		display = 0x04,
+		TTS = 0x08,
+		ad = 0x10,
+	};
+
+	int fromStream(unsigned char * ori);
+};
+
+class EventSetting
+{
+public:
+	MsgHeader header;//0x8301
+	BYTE type;
+	BYTE count;
+
+	enum
+	{
+		deleteEvent = 0x00,
+		updateEvent = 0x01,
+		appendEvent = 0x02,
+		modifyEvent = 0x03,
+		deleteSomeEvent = 0x04,
+
+	};
+
+	struct EventItem
+	{
+		BYTE id;
+		BYTE len;
+		STRING content;
+	};
+
+	int fromStream(unsigned char * ori);
+	void handleEvent();
+	vector<EventItem> eventFromStream; //
+	static vector<EventItem> eventList;
+};
+
+class EventReport
+{
+public:
+	MsgHeader header;//0x0301
+	BYTE eventId;
+
+	EventReport();
+	int toStream(unsigned char * ori);
+};
+
+class Ask
+{
+public:
+	MsgHeader header; //0x8302
+	BYTE mark;
+	BYTE questionLength;
+	STRING question;
+
+	enum
+	{
+		urgent = 0x01,
+		tts = 0x08,
+		display = 0x10,
+	};
+
+	struct Answer
+	{
+		BYTE id;
+		WORD len;
+		STRING content;
+	};
+
+	int fromStream(unsigned char * ori);
+	vector<Answer> answerList;
+};
+
+class AskAck
+{
+public:
+	MsgHeader header; //0x0302
+	WORD sn;
+	BYTE answerId;
+
+	AskAck();
+
+	int toStream(unsigned char * ori);
+};
+
+class InfoDemandMenu
+{
+public:
+	MsgHeader header; //0x8303
+	BYTE type;
+	BYTE count;
+
+	enum
+	{
+		deleteAllInfo = 0,
+		updateMenu = 1,
+		appendMenu = 2,
+		modifyMenu = 3,
+	};
+
+	struct Info
+	{
+		BYTE type;
+		WORD len;
+		STRING name;
+	};
+
+	vector<Info> infoFromStream;
+	static vector<Info> infoList;
+
+	int fromStream(unsigned char * ori);
+	void handleInfo();
+};
+
+class InfoDemandOrCancel
+{
+public:
+	MsgHeader header; //0x0303
+	BYTE type;
+	BYTE demandOrCancel;
+
+	enum
+	{
+		cancel = 0,
+		demand = 1
+	};
+
+	InfoDemandOrCancel();
+	int toStream(unsigned char * ori);
+
+};
+
+class InfoService
+{
+public:
+	MsgHeader header;// 0x8304
+	BYTE type;
+	WORD len;
+	STRING content;
+
+	int fromStream(unsigned char * ori);
+};
+
+class Callback
+{
+public:
+	MsgHeader header; //0x8400
+	BYTE mark;
+	STRING phoneNumber;
+
+	enum
+	{
+		normal = 0,
+		monitor = 1,
+	};
+
+	int fromStream(unsigned char * ori);
+};
+
+class SetPhoneBook
+{
+public:
+	MsgHeader header; //0x8401
+	BYTE type;
+	BYTE count;
+
+	enum
+	{
+		deleteAll = 0,
+		update = 1,
+		append = 2,
+		modify = 3
+	};
+
+	enum
+	{
+		callIn = 1,
+		callOut = 2,
+		inAndOut = 3,
+	};
+	struct Contact
+	{
+		BYTE mark;
+		BYTE numberLength;
+		STRING phoneNumber;
+		BYTE contactLength;
+		STRING name;
+
+	};
+
+	vector<Contact> contactFromStream;
+	static vector<Contact> contactList;
+
+	int fromStream(unsigned char * ori);
+	void handleContact();
+};
+
+class VehicleControl
+{
+public:
+	MsgHeader header; //0x8500
+	BYTE mark;
+
+	enum
+	{
+		lock = 0x01
+	};
+
+	int fromStream(unsigned char * ori);
+
+};
+
+class VehicleControlAck
+{
+public:
+	MsgHeader header; //0x0500
+	WORD sn;
+	DWORD warningMark;
+	DWORD status;
+	DWORD latitude;
+	DWORD longitude;
+	WORD altitude;
+	WORD speed;
+	WORD direction;
+	BCD time[6];
+
+	int toStream(unsigned char * original);
+
+
+};
+
+enum AreaProperty
+{
+	AREA_BY_TIME = 0x01,
+	AREA_LIMIT_SPEED = 0x02,
+	AREA_IN_TO_DRIVER = 0x04,
+	AREA_IN_TO_PLATFORM = 0x08,
+	AREA_OUT_TO_DRIVER = 0x10,
+	AREA_OUT_TO_PLATFORM = 0x20,
+	AREA_SOUTH_LATITUDE = 0x40,
+	AREA_WEST_LONGITUDE = 0x80,
+};
+
+class SetCircle
+{
+public:
+	MsgHeader header; //0x8600
+	BYTE type;
+	BYTE count;
+
+	enum
+	{
+		updateArea = 0,
+		appendArea = 1,
+		modifyArea = 2,
+	};
+
+	struct Circle
+	{
+		DWORD id;
+		WORD property;
+		DWORD centerLatitude;
+		DWORD centerLongitude;
+		DWORD radius;
+		BCD startTime[6];
+		BCD endTime[6];
+		WORD maximumSpeed;
+		BYTE overspeedLastTime;
+	};
+
+	vector<Circle> circleFromStream;
+	static vector<Circle> circleList;
+
+	int fromStream(unsigned char * ori);
+	void handleCircle();
 };
 #endif /* DATASTRUCT_H_ */

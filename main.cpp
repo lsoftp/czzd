@@ -13,7 +13,7 @@ int main(int argc,char* argv[])
         Config cg;
         //cout<<"id "<<cg.m_paramlist["heartBeat"].id<<"value "<<cg.m_paramlist["heartBeat"].value<<endl;
         tc.start();
-		tc.toOriginalMsg(com, 11,  original,&len );
+		/*tc.toOriginalMsg(com, 11,  original,&len );
 		for(int i = 0; i<len; i++)
             printf("%02x ",original[i]);
         printf("\n%d\n",len);
@@ -23,7 +23,7 @@ int main(int argc,char* argv[])
 		tc.toComposedMsg(ori, 6, compo, &len);
 		for(int i = 0; i<len; i++)
             printf("%02x ",compo[i]);
-        printf("\n%d\n",len);
+        printf("\n%d\n",len);*/
         for(;;);
         return 0;  
 }  
