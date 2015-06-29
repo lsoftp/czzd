@@ -36,6 +36,7 @@ private:
         static pthread_mutex_t mutexRecvStream;
         static list<WORD> serialNumberList;
         static pthread_mutex_t mutexserialNumber;
+        static pthread_cond_t condRecv;
         static WORD m_serialNumber;
         static BYTE m_phoneNumber[6];
         static int m_timeout; //usecond

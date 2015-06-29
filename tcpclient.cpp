@@ -8,6 +8,7 @@ list<RecvStream> TcpClient::recvStreamList;
 pthread_mutex_t TcpClient::mutexRecvStream;
 list<WORD> TcpClient::serialNumberList;
 pthread_mutex_t TcpClient::mutexserialNumber;
+pthread_cond_t  TcpClient::condRecv = PTHREAD_COND_INITIALIZER;
 WORD TcpClient::m_serialNumber = 0;
 BYTE TcpClient::m_phoneNumber[6] = {0x01,0x39,0x16,0x85,0x96,0x14};
 int TcpClient::m_timeout = 2500000;
@@ -29,6 +30,7 @@ TcpClient::~TcpClient()
 	pthread_mutex_destroy(&mutex);
 	pthread_mutex_destroy(&mutexRecvStream);
 	pthread_mutex_destroy(&mutexserialNumber);
+	pthread_cond_destroy(&condRecv);
 
 }
 
@@ -97,6 +99,11 @@ void * TcpClient::sendRecv(void* arg)
 	        	 else{
 	        		 recvbuf.size += recvChars;
 
+
+	        	 }
+	        	 if(recvbuf.size > 0)
+	        	 {
+	        		 pthread_cond_signal(&condRecv);
 	        	 }
 	        	 pthread_mutex_unlock(&mutexRecvStream);
 	         }
@@ -142,11 +149,11 @@ void * TcpClient::handleRecvMsg(void *arg)
 	while(1)
 	{
 		pthread_mutex_lock(&mutexRecvStream);
-		if(recvbuf.size >0)
+		if(recvbuf.size <=0)
 		{
-			r = recvbuf.getDataFromBuf(recvstream.stream, &(recvstream.size));
+			pthread_cond_wait(&condRecv,&mutexRecvStream);
 		}
-
+		r = recvbuf.getDataFromBuf(recvstream.stream, &(recvstream.size));
 		pthread_mutex_unlock(&mutexRecvStream);
 		 if(r)
 		 {
