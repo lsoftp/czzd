@@ -782,7 +782,7 @@ int SetCircle::fromStream(unsigned char * ori)
 		}
 		if(ci.property & AREA_LIMIT_SPEED)
 		{
-			ci.maximumSpeed = ntohl(*(DWORD *)(ori + j));
+			ci.maximumSpeed = ntohs(*(WORD *)(ori + j));
 			j += 2;
 			ci.overspeedLastTime = *(ori + j);
 			j += 1;
@@ -821,4 +821,363 @@ void SetCircle::handleCircle()
 			break;
 	}
 
+}
+
+int DeleteCircle::fromStream(unsigned char * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	count = *(ori + j);
+	for(int i = 0; i < count; i++)
+	{
+		DWORD dw = ntohl(*(DWORD*)(ori+j));
+		j += 4;
+		idFromStream.push_back(dw);
+	}
+
+	return j;
+}
+
+void DeleteCircle::handleCircle()
+{
+	if(0 == count)
+	{
+		SetCircle::circleList.clear();
+	}
+	else
+	{
+		for(int i = 0; i < count; i++)
+		{
+			vector<SetCircle::Circle>::iterator it=SetCircle::circleList.begin();
+			for(; it != SetCircle::circleList.end(); )
+			{
+				if(idFromStream[i] == (*it).id)
+				{
+					it  = SetCircle::circleList.erase(it);
+
+				}
+				else
+				{
+					it++;
+				}
+			}
+		}
+	}
+}
+
+
+vector<SetRect::Rect> SetRect::rectList;
+
+int SetRect::fromStream(unsigned char * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	type = *(ori + j);
+	j += 1;
+	count = *(ori + j);
+	j += 1;
+
+	for(int i = 0; i < count; i++)
+	{
+		Rect re;
+		re.id = ntohl(*(DWORD *)(ori + j));
+		j += 4;
+		re.property = ntohs(*(WORD *)(ori + j));
+		j += 2;
+		re.leftTopLatitude = ntohl(*(DWORD*)(ori + j));
+		j += 4;
+		re.leftTopLongitude = ntohl(*(DWORD*)(ori + j));
+		j += 4;
+		re.rightBottomLatitude = ntohl(*(DWORD*)(ori + j));
+		j += 4;
+		re.rightBottomLongitude = ntohl(*(DWORD*)(ori + j));
+		j += 4;
+		if(re.property & AREA_BY_TIME)
+		{
+			memcpy(&re.startTime, ori + j, 6);
+			j += 6;
+			memcpy(&re.endTime, ori + j, 6);
+			j += 6;
+		}
+		if(re.property & AREA_LIMIT_SPEED)
+		{
+			re.maximumSpeed = ntohs(*(WORD *)(ori + j));
+			j += 2;
+			re.overspeedLastTime = *(ori + j);
+			j += 1;
+		}
+		rectFromStream.push_back(re);
+	}
+}
+
+void SetRect::handleRect()
+{
+	switch(type)
+	{
+		case updateArea:
+			rectList.swap(rectFromStream);
+			break;
+		case appendArea:
+			for(int i = 0; i < rectFromStream.size(); i++)
+			{
+				rectList.push_back(rectFromStream[i]);
+			}
+			break;
+		case modifyArea:
+			for(int i = 0; i < rectFromStream.size(); i++)
+			{
+				Rect re = rectFromStream[i];
+				for(int j = 0; j < rectList.size(); j++)
+				{
+					if(rectList[j].id == re.id)
+					{
+						rectList[j] = re;
+					}
+				}
+			}
+			break;
+		default:
+			break;
+	}
+
+}
+
+int DeleteRect::fromStream(unsigned char * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	count = *(ori + j);
+	for(int i = 0; i < count; i++)
+	{
+		DWORD dw = ntohl(*(DWORD*)(ori+j));
+		j += 4;
+		idFromStream.push_back(dw);
+	}
+
+	return j;
+}
+
+void DeleteRect::handleRect()
+{
+	if(0 == count)
+	{
+		SetRect::rectList.clear();
+	}
+	else
+	{
+		for(int i = 0; i < count; i++)
+		{
+			vector<SetRect::Rect>::iterator it=SetRect::rectList.begin();
+			for(; it != SetRect::rectList.end(); )
+			{
+				if(idFromStream[i] == (*it).id)
+				{
+					it  = SetRect::rectList.erase(it);
+
+				}
+				else
+				{
+					it++;
+				}
+			}
+		}
+	}
+}
+
+
+int SetPolygon::fromStream(unsigned char * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	id = ntohl(*(DWORD *)(ori + j));
+	j += 4;
+	property = ntohs(*(WORD *)(ori + j));
+	j += 2;
+	if(property & AREA_BY_TIME)
+	{
+		memcpy(&startTime, ori + j, 6);
+		j += 6;
+		memcpy(&endTime, ori + j, 6);
+		j += 6;
+	}
+	if(property & AREA_LIMIT_SPEED)
+	{
+		maximumSpeed = ntohs(*(WORD *)(ori + j));
+		j += 2;
+		overspeedLastTime = *(ori + j);
+		j += 1;
+	}
+	count = ntohl(*(WORD *)(ori + j));
+	j += 2;
+
+	for(int i = 0; i < count; i++)
+	{
+		Point p;
+		p.latitude = ntohl(*(DWORD *)(ori + j));
+		j += 4;
+		p.longitude =  ntohl(*(DWORD *)(ori + j));
+		j += 4;
+		pointFromStream.push_back(p);
+	}
+
+	return j;
+}
+
+void SetPolygon::handlePolygon()
+{
+
+	Polygon::polygonList.push_back(*(this));
+}
+
+vector<SetPolygon> Polygon::polygonList;
+
+int DeletePolygon::fromStream(unsigned char * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	count = *(ori + j);
+	for(int i = 0; i < count; i++)
+	{
+		DWORD dw = ntohl(*(DWORD*)(ori+j));
+		j += 4;
+		idFromStream.push_back(dw);
+	}
+
+	return j;
+}
+
+void DeletePolygon::handlePolygon()
+{
+	if(0 == count)
+	{
+		Polygon::polygonList.clear();
+	}
+	else
+	{
+		for(int i = 0; i < count; i++)
+		{
+			vector<SetPolygon>::iterator it=Polygon::polygonList.begin();
+			for(; it != Polygon::polygonList.end(); )
+			{
+				if(idFromStream[i] == (*it).id)
+				{
+					it  = Polygon::polygonList.erase(it);
+
+				}
+				else
+				{
+					it++;
+				}
+			}
+		}
+	}
+}
+
+int SetRoute::fromStream(unsigned char * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	id = ntohl(*(DWORD *)(ori + j));
+	j += 4;
+	property = ntohs(*(WORD *)(ori + j));
+	j += 2;
+	if(property & ROUTE_BY_TIME)
+	{
+		memcpy(&startTime, ori + j, 6);
+		j += 6;
+		memcpy(&endTime, ori + j, 6);
+		j += 6;
+	}
+	count = ntohs(*(WORD *)(ori + j));
+
+	for(int i = 0; i < count; i++)
+	{
+		TurningPoint tp;
+		tp.turningPointId = ntohl(*(DWORD *)(ori + j));
+		j += 4;
+		tp.lineId = ntohl(*(DWORD *)(ori + j));
+		j += 4;
+		tp.latitude = ntohl(*(DWORD *)(ori + j));
+		j += 4;
+		tp.longitude = ntohl(*(DWORD *)(ori + j));
+		j += 4;
+		tp.lineWidth = *(ori + j);
+		j += 1;
+		tp.lineProperty = *(ori + j);
+		j += 1;
+		if(tp.lineProperty & LINE_DRIVING_TIME)
+		{
+			tp.timeTooLongThreshold = ntohs(*(WORD *)(ori + j));
+			j += 2;
+			tp.timeShortThreshold = ntohs(*(WORD *)(ori + j));
+			j += 2;
+		}
+		if(tp.lineProperty & LINE_LIMIT_SPEED)
+		{
+			tp.maximumSpeed = ntohs(*(WORD *)(ori + j));
+			j += 2;
+			tp.overSpeedLastTime = ntohs(*(WORD *)(ori + j));
+			j += 2;
+		}
+		turningPointFromStream.push_back(tp);
+	}
+}
+
+void SetRoute::handleRoute()
+{
+	Route::routeList.push_back(*this);
+}
+
+vector<SetRoute> Route::routeList;
+
+int DeleteRoute::fromStream(unsigned char * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	count = *(ori + j);
+	for(int i = 0; i < count; i++)
+	{
+		DWORD dw = ntohl(*(DWORD*)(ori+j));
+		j += 4;
+		idFromStream.push_back(dw);
+	}
+
+	return j;
+}
+
+void DeleteRoute::handleRoute()
+{
+	if(0 == count)
+	{
+		Route::routeList.clear();
+	}
+	else
+	{
+		for(int i = 0; i < count; i++)
+		{
+			vector<SetRoute>::iterator it=Route::routeList.begin();
+			for(; it != Route::routeList.end(); )
+			{
+				if(idFromStream[i] == (*it).id)
+				{
+					it  = Route::routeList.erase(it);
+
+				}
+				else
+				{
+					it++;
+				}
+			}
+		}
+	}
+}
+
+int DrivingRecordDataCollect::fromStream(unsigned char * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	cmd = *(ori + j);
+	j += 1;
+
+	return j;
 }

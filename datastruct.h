@@ -137,6 +137,7 @@ struct MsgHeader
 	WORD msgSerialNumber;
 	WORD packetCount;
 	WORD packetNo;
+
 	int toStream(unsigned char * original)
 	{
 		int j = 0;
@@ -163,6 +164,7 @@ struct MsgHeader
 		}
 		return j;
 	}
+
 	int fromStream(unsigned char * original)
 	{
 		int j =0;
@@ -915,4 +917,197 @@ public:
 	int fromStream(unsigned char * ori);
 	void handleCircle();
 };
+
+class DeleteCircle
+{
+public:
+	MsgHeader header; //0x8601
+	BYTE count;
+
+	vector<DWORD> idFromStream;
+
+	int fromStream(unsigned char * ori);
+	void handleCircle();
+};
+
+class SetRect
+{
+public:
+	MsgHeader header; //0x8602
+	BYTE type;
+	BYTE count;
+
+	enum
+	{
+		updateArea = 0,
+		appendArea = 1,
+		modifyArea = 2,
+	};
+
+	struct Rect
+	{
+		DWORD id;
+		WORD property;
+		DWORD leftTopLatitude;
+		DWORD leftTopLongitude;
+		DWORD rightBottomLatitude;
+		DWORD rightBottomLongitude;
+		BCD startTime[6];
+		BCD endTime[6];
+		WORD maximumSpeed;
+		BYTE overspeedLastTime;
+	};
+
+	vector<Rect> rectFromStream;
+	static vector<Rect> rectList;
+
+	int fromStream(unsigned char * ori);
+	void handleRect();
+};
+
+class DeleteRect
+{
+public:
+	MsgHeader header; //0x8603
+	BYTE count;
+
+	vector<DWORD> idFromStream;
+
+	int fromStream(unsigned char * ori);
+	void handleRect();
+};
+
+class SetPolygon
+{
+public:
+	MsgHeader header; //0x8604
+	DWORD id;
+	WORD property;
+	BCD startTime[6];
+	BCD endTime[6];
+	WORD maximumSpeed;
+	BYTE overspeedLastTime;
+	WORD count;
+
+	struct Point
+	{
+		DWORD latitude;
+		DWORD longitude;
+	};
+
+	vector<Point> pointFromStream;
+
+	int fromStream(unsigned char * ori);
+	void handlePolygon();
+
+};
+
+class Polygon
+{
+public:
+	static vector<SetPolygon> polygonList;
+};
+
+class DeletePolygon
+{
+public:
+	MsgHeader header; //0x8605
+	BYTE count;
+
+	vector<DWORD> idFromStream;
+
+	int fromStream(unsigned char * ori);
+	void handlePolygon();
+};
+
+class SetRoute
+{
+public:
+	MsgHeader header; //0x8606
+	DWORD id;
+	WORD property;
+	BCD startTime[6];
+	BCD endTime[6];
+	WORD count;
+
+	enum RouteProperty
+	{
+		ROUTE_BY_TIME = 0x01,
+		ROUTE_IN_TO_DRIVER = 0x04,
+		ROUTE_IN_TO_PLATFORM = 0x08,
+		ROUTE_OUT_TO_DRIVER = 0x10,
+		ROUTE_OUT_TO_PLATFORM = 0x20,
+
+	};
+
+	enum LineProperty
+	{
+		LINE_DRIVING_TIME = 0x01,
+		LINE_LIMIT_SPEED = 0x02,
+		LINE_SOUTH_LATITUDE = 0x04,
+		LINE_WEST_LONGITUDE = 0x08,
+	};
+
+	struct TurningPoint
+	{
+		DWORD turningPointId;
+		DWORD lineId;
+		DWORD latitude;
+		DWORD longitude;
+		BYTE lineWidth;
+		BYTE lineProperty;
+		WORD timeTooLongThreshold;
+		WORD timeShortThreshold;
+		WORD maximumSpeed;
+		WORD overSpeedLastTime;
+
+	};
+
+	vector<TurningPoint> turningPointFromStream;
+
+	int fromStream(unsigned char * ori);
+	void handleRoute();
+};
+
+class Route
+{
+public:
+	static vector<SetRoute> routeList;
+};
+
+class DeleteRoute
+{
+public:
+	MsgHeader header; //0x8607
+	BYTE count;
+
+	vector<DWORD> idFromStream;
+
+	int fromStream(unsigned char * ori);
+	void handleRoute();
+};
+
+class DrivingRecordDataCollect
+{
+public:
+	MsgHeader header; //0x8700
+	BYTE cmd;
+
+
+
+	int fromStream(unsigned char * ori);
+
+};
+
+class DrivingRecordDataUpload
+{
+public:
+	MsgHeader header; //0x0700
+	WORD sn;
+	BYTE cmd;
+
+	void * data;
+	int dataSize;
+};
+
 #endif /* DATASTRUCT_H_ */
