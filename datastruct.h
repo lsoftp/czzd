@@ -1106,8 +1106,288 @@ public:
 	WORD sn;
 	BYTE cmd;
 
-	void * data;
-	int dataSize;
+	struct ExecuteVersion
+	{
+		BCD year;
+		BYTE modifyNumer;
+	};
+
+	struct DriverInfo
+	{
+		BYTE driverLicenseNumber[18];
+	};
+
+	struct RealTime
+	{
+		BCD time[6];
+	};
+
+	struct TotalMileage
+	{
+		BCD time[6];
+		BCD installTime[6];
+		BCD initialMileage[4];
+		BCD totalDriveMileage[4];
+	};
+
+	struct PulseFactor
+	{
+		BCD time[6];
+		WORD pulse;
+	};
+
+	struct VehicleInfo
+	{
+		BYTE vehicleId[17];
+		BYTE plateNumber[12];
+		BYTE plateClass[12];
+	};
+
+	struct StatusSignalConfig
+	{
+		BCD time[6];
+		BYTE bytes;
+		BYTE status[80];
+
+	};
+
+	struct OnlyNo
+	{
+		BYTE ccc[7];
+		BYTE type[16];
+		BCD year;
+		BCD month;
+		BCD day;
+		BYTE sn[4];
+		BYTE backup[5];
+	};
+
+	union Data
+	{
+		ExecuteVersion executeVersion;
+		DriverInfo driverInfo;
+		RealTime realTime;
+		TotalMileage totalMileage;
+		PulseFactor pulseFactor;
+		VehicleInfo vehicleInfo;
+		StatusSignalConfig statusSignalConfig;
+		OnlyNo onlyNo;
+	};
+
+
 };
 
+class DrivingRecordParamDownload
+{
+public:
+	MsgHeader header; //0x8701
+	BYTE cmd;
+
+	BYTE * data;
+};
+
+
+class EWaybill
+{
+public:
+	MsgHeader header; //0x0701
+	DWORD length;
+
+	BYTE * data;
+
+};
+
+class DriverIdReport
+{
+public:
+	MsgHeader header; //0x0702
+	BYTE nameLength;
+	STRING name;
+	STRING idCardNo; //20
+	STRING jobNo; //40
+	BYTE CertificateIssuerLength;
+	STRING CertificateIssuer;
+
+	int toStream(BYTE * ori);
+};
+
+class MultimediaEventInfoUpload
+{
+public:
+	MsgHeader header; //0x0800
+	DWORD id;
+	BYTE type;
+	BYTE format;
+	BYTE eventItem;
+	BYTE channelId;
+
+	int toStream(BYTE * ori);
+};
+
+class MultimediaUpload
+{
+public:
+	MsgHeader header; //0x0801
+	DWORD id;
+	BYTE type;
+	BYTE format;
+	BYTE eventItem;
+	BYTE channelId;
+	BYTE *data;
+
+};
+
+class MultimediaUploadAck
+{
+public:
+	MsgHeader header; //0x8800
+	DWORD id;
+	BYTE count;
+
+	vector<WORD> idList;
+
+	int fromStream(BYTE * ori);
+};
+
+class CameraFilm
+{
+public:
+	MsgHeader header; //0x8801
+	BYTE channelId;
+	WORD cmd;
+	WORD intervalOrTime;
+	BYTE saveFlag;
+	BYTE resolution;
+	BYTE quality;
+	BYTE brightness;
+	BYTE contrast;
+	BYTE saturation;
+	BYTE chroma;
+	enum
+	{
+		R320_240 = 0x01,
+		R640_480 = 0x02,
+		R800_600 = 0x03,
+		R1024_768 = 0x04,
+		R176_144 = 0x05,
+		R352_288 = 0x06,
+		R704_288 = 0x07,
+		R704_576 = 0x08
+	};
+
+	int fromStream(BYTE * ori);
+};
+
+class MultimediaDataRetrieve
+{
+public:
+	MsgHeader header; //0x8802
+	BYTE type;
+	BYTE channelId;
+	BYTE eventItem;
+	BCD startTime[6];
+	BCD endTime[6];
+
+	int fromStream(BYTE * ori);
+};
+
+class MultimediaDataRetrieveAck
+{
+public:
+	MsgHeader header; //0x0802
+	WORD sn;
+	WORD count;
+
+	struct MultimediaDataRetrieveItem
+	{
+		BYTE type;
+		BYTE channelId;
+		BYTE eventItem;
+		DWORD warningMark;
+		DWORD status;
+		DWORD latitude;
+		DWORD longitude;
+		WORD altitude;
+		WORD speed;
+		WORD direction;
+		BCD time[6];
+	};
+
+	vector<MultimediaDataRetrieveItem> multimediaList;
+	int toStream(BYTE * ori);
+};
+
+class MultimediaUploadCmd
+{
+public:
+	MsgHeader header; //0x8803
+
+	BYTE type;
+	BYTE channelId;
+	BYTE eventItem;
+	BCD startTime[6];
+	BCD endTime[6];
+	BYTE delFlag;
+
+	int fromStream(BYTE * ori);
+
+};
+
+
+class RecordStartCmd
+{
+public:
+	MsgHeader header; //0x8804
+	BYTE cmd;
+	WORD time;
+	BYTE saveFlag;
+	BYTE SampleRate;
+
+	int fromStream(BYTE * ori);
+
+};
+
+class DownPassThrough
+{
+public:
+	MsgHeader header; //0x8900
+	BYTE type;
+	BYTE *data;
+	int size;
+};
+
+class UpPassThrough
+{
+public:
+	MsgHeader header; //0x8900
+	BYTE type;
+	BYTE *data;
+	int size;
+};
+
+class GzipUpload
+{
+public:
+	MsgHeader header; //0x0901
+	DWORD len;
+	BYTE *data;
+};
+
+class PlatformRsaPublicKey
+{
+public:
+	MsgHeader header; //0x8A00
+	DWORD e;
+	BYTE n[128];
+
+};
+
+class TerminalRsaPublicKey
+{
+public:
+	MsgHeader header; //0x0A00
+	DWORD e;
+	BYTE n[128];
+
+};
 #endif /* DATASTRUCT_H_ */

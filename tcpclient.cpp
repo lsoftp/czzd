@@ -38,16 +38,16 @@ void * TcpClient::sendRecv(void* arg)
 {
 		pthread_detach(pthread_self());
 	   TcpClient *ptc = (TcpClient*)arg;
-	   int ret1 =open("127.0.0.1","8899");
+	   int ret1 =open((char*)("127.0.0.1"),(char*)("8899"));
 	   if(ret1 != 0) return NULL;
 	   int sfd=ptc->socket_fd;
 	   fd_set readset, writeset;
 	   Msg *pmsg=NULL;
 
-	   RecvStream recvstream;
-	   struct timeval timeout={0,200},endtime;
+
+	   struct timeval timeout={0,200};
 	   int maxfd;
-	   int ret, sendChars,recvChars, r;
+	   int ret, sendChars,recvChars;
 
 	   while (1)
 	   {
@@ -170,7 +170,7 @@ void * TcpClient::handleRecvMsg(void *arg)
 			{
 			//parse msg
 				MsgHeader header;
-				int j = header.fromStream(rs.stream);
+				header.fromStream(rs.stream);
 				switch(header.msgId)
 				{
 					case 0x8100: handleRegisterAck(&rs);break;
@@ -181,13 +181,13 @@ void * TcpClient::handleRecvMsg(void *arg)
 			r=0;
 		 }
 	}
-
+	return NULL;
 }
 
 void TcpClient::handlePlatformAck(RecvStream *prs)
 {
 	PlatformAck pa;
-	int j= pa.fromStream(prs->stream);
+	pa.fromStream(prs->stream);
 	WORD serialNumber = pa.serialNumber;
 	cout<<"sn:"<<pa.serialNumber<<endl;
 	pthread_mutex_lock(&mutexserialNumber);
@@ -198,7 +198,7 @@ void TcpClient::handlePlatformAck(RecvStream *prs)
 void TcpClient::handleRegisterAck(RecvStream *prs)
 {
 	RegisterAck ra;
-	int j = ra.fromStream(prs->stream, prs->size);
+	ra.fromStream(prs->stream, prs->size);
 	WORD serialNumber = ra.sn;
 	cout<<"sn:"<<ra.sn<<endl;
 	pthread_mutex_lock(&mutexserialNumber);
@@ -297,7 +297,11 @@ int  TcpClient::handleMsgList()
 		serialNumberList.erase(it++);
 	}
 	pthread_mutex_unlock(&mutexserialNumber);
+
+	return 0;
 }
+
+
 int TcpClient::start()
 {
     int ret = pthread_create(&sendRecvHandler, NULL, TcpClient::sendRecv, this);
@@ -335,10 +339,10 @@ int TcpClient::start()
 	r.plateNumber="abcde";
 
 	int len;
-	printf("\nlen:%d   \n",len);
+	//printf("\nlen:%d   \n",len);
 	len = r.toStream(ori);
 	printf("\nlen:%d   \n",len);
-	int l;
+	//int l;
 	len = addCheckCode(ori,len);
 
 	toComposedMsg(ori,len, msg.stream, &(msg.len));
@@ -356,6 +360,8 @@ int TcpClient::start()
 	pthread_mutex_lock(&mutex);
 	msgList.push_front(msg);
 	pthread_mutex_unlock(&mutex);
+
+	return 0;
 
 }
 int TcpClient::open(char * server_ip, char * server_port)

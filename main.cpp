@@ -5,9 +5,9 @@ using namespace std;
   
 int main(int argc,char* argv[])  
 {  
-		unsigned char com[11] ={0x7e, 0x30, 0x7d,0x02,0x7d,0x02,0x08,0x7d,0x01,0x55,0x7e};
-		int len =0;
-		unsigned char original[11];
+		//unsigned char com[11] ={0x7e, 0x30, 0x7d,0x02,0x7d,0x02,0x08,0x7d,0x01,0x55,0x7e};
+		//int len =0;
+		//unsigned char original[11];
         TcpClient tc;  
        // tc.open("192.168.10.83","8899");
         Config cg;

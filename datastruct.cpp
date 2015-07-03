@@ -127,6 +127,7 @@ int SetParam::getParam(unsigned char* ori)
 		}
 		j +=length;
 	}
+	return j;
 }
 
 int TerminalControl::fromStream(unsigned char * ori, int size)
@@ -328,6 +329,7 @@ int TextInfo::fromStream(unsigned char * ori)
 	}
 	text = p;
 
+	return j;
 }
 
 vector<EventSetting::EventItem> EventSetting::eventList;
@@ -369,6 +371,8 @@ int EventSetting::fromStream(unsigned char * ori)
 			j += l;
 		}
 	}
+
+	return j;
 }
 
 void EventSetting::handleEvent()
@@ -379,7 +383,7 @@ void EventSetting::handleEvent()
 							break;
 		case updateEvent: 	eventList.swap(eventFromStream);
 							break;
-		case appendEvent:	for(int i =0; i < eventFromStream.size(); i++)
+		case appendEvent:	for(vector<EventItem>::size_type i =0; i < eventFromStream.size(); i++)
 							{
 								eventList.push_back(eventFromStream[i]);
 							}
@@ -478,7 +482,7 @@ int Ask::fromStream(unsigned char * ori)
 	}
 
 
-
+	return j;
 }
 
 AskAck::AskAck()
@@ -530,6 +534,8 @@ int InfoDemandMenu::fromStream(unsigned char * ori)
 		j = j + in.len;
 		infoFromStream.push_back(in);
 	}
+
+	return j;
 }
 
 
@@ -789,6 +795,7 @@ int SetCircle::fromStream(unsigned char * ori)
 		}
 		circleFromStream.push_back(ci);
 	}
+	return j;
 }
 
 void SetCircle::handleCircle()
@@ -908,6 +915,8 @@ int SetRect::fromStream(unsigned char * ori)
 		}
 		rectFromStream.push_back(re);
 	}
+
+	return j;
 }
 
 void SetRect::handleRect()
@@ -1121,6 +1130,8 @@ int SetRoute::fromStream(unsigned char * ori)
 		}
 		turningPointFromStream.push_back(tp);
 	}
+
+	return j;
 }
 
 void SetRoute::handleRoute()
@@ -1177,6 +1188,219 @@ int DrivingRecordDataCollect::fromStream(unsigned char * ori)
 	int j = 0;
 	j = header.fromStream(ori);
 	cmd = *(ori + j);
+	j += 1;
+
+	return j;
+}
+
+int DriverIdReport::toStream(BYTE * ori)
+{
+	int j = 0;
+	j = header.toStream(ori);
+	*(ori + j) = nameLength;
+	j += 1;
+	memcpy(ori + j, name.c_str(), name.length() + 1);
+	if(nameLength != (name.length() + 1))
+	{
+		throw length_error("bad string in name driver id report");
+	}
+	j += nameLength;
+	memcpy(ori + j, idCardNo.c_str(), idCardNo.length() + 1);
+	if(20 != (idCardNo.length() + 1))
+	{
+		throw length_error("bad string in name driver id report");
+	}
+	j += 20;
+	memcpy(ori + j, jobNo.c_str(), jobNo.length() + 1);
+	if(40 != (jobNo.length() + 1))
+	{
+		throw length_error("bad string in name driver id report");
+	}
+	j += 40;
+
+	*(ori + j) = CertificateIssuerLength;
+	j += 1;
+	memcpy(ori + j, CertificateIssuer.c_str(), CertificateIssuer.length() + 1);
+	if(CertificateIssuerLength != (CertificateIssuer.length() + 1))
+	{
+		throw length_error("bad string in name driver id report");
+	}
+	j += CertificateIssuerLength;
+
+	return j;
+
+}
+
+int MultimediaEventInfoUpload::toStream(BYTE *ori)
+{
+	int j = 0;
+	j = header.toStream(ori);
+	DWORD dw;
+	dw = htonl(id);
+	memcpy(ori + j, &dw, 4);
+	j += 4;
+	*(ori + j) = type;
+	j += 1;
+	*(ori + j) = format;
+	j += 1;
+	*(ori + j) = eventItem;
+	j += 1;
+	*(ori + j) = channelId;
+	j += 1;
+
+	return j;
+}
+
+int MultimediaUploadAck::fromStream(BYTE *ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	id = ntohl(*(DWORD *)(ori + j));
+	j += 4;
+	count = *(ori + j);
+	j += 1;
+
+	for(int i = 0; i < count; i++)
+	{
+		WORD wo;
+		wo = ntohs(*(WORD *)(ori + j));
+		j += 2;
+		idList.push_back(wo);
+	}
+
+	return j;
+}
+
+int CameraFilm::fromStream(BYTE *ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	channelId = *(ori + j);
+	j += 1;
+	cmd = ntohs(*(WORD *)(ori + j));
+	j += 2;
+	intervalOrTime = ntohs(*(WORD *)(ori + j));
+	j += 2;
+	saveFlag = *(ori + j);
+	j += 1;
+	resolution = *(ori + j);
+	j += 1;
+	quality = *(ori + j);
+	j += 1;
+	brightness = *(ori + j);
+	j += 1;
+	contrast = *(ori + j);
+	j += 1;
+	saturation = *(ori + j);
+	j += 1;
+	chroma = *(ori + j);
+	j += 1;
+
+	return j;
+}
+
+int MultimediaDataRetrieve::fromStream(BYTE * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	type = *(ori + j);
+	j += 1;
+	channelId = *(ori + j);
+	j += 1;
+	eventItem = *(ori + j);
+	j += 1;
+	memcpy(startTime, ori + j, 6);
+	j += 6;
+	memcpy(endTime, ori + j, 6);
+	j += 6;
+
+	return j;
+
+}
+
+
+int MultimediaDataRetrieveAck::toStream(BYTE * ori)
+{
+	int j = 0;
+	j = header.toStream(ori);
+	WORD wo = htons(sn);
+	memcpy(ori + j , &wo, 2);
+	j += 2;
+	wo = htons(count);
+	memcpy(ori + j , &wo, 2);
+	j += 2;
+
+	for(int i = 0; i < count; i++)
+	{
+		MultimediaDataRetrieveItem mi = multimediaList[i];
+		*(ori + j) = mi.type;
+		j += 1;
+		*(ori + j) = mi.channelId;
+		j += 1;
+		*(ori + j) = mi.eventItem;
+		j += 1;
+		DWORD dw = htonl(mi.warningMark);
+		memcpy(ori + j, &dw, sizeof(dw));
+		j += 4;
+		dw = htonl(mi.status);
+		memcpy(ori + j, &dw, sizeof(dw));
+		j += 4;
+		dw = htonl(mi.latitude);
+		memcpy(ori + j, &dw, sizeof(dw));
+		j += 4;
+		dw = htonl(mi.longitude);
+		memcpy(ori + j, &dw, sizeof(dw));
+		j += 4;
+		WORD wo;
+		wo = htons(mi.altitude);
+		memcpy(ori + j, &wo, sizeof(wo));
+		j += 2;
+		wo = htons(mi.speed);
+		memcpy(ori + j, &wo, sizeof(wo));
+		j += 2;
+		wo = htons(mi.direction);
+		memcpy(ori + j, &wo, sizeof(wo));
+		j += 2;
+		memcpy(ori + j, mi.time, 6);
+		j += 6;
+
+	}
+
+	return j;
+}
+
+int MultimediaUploadCmd::fromStream(BYTE * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	type = *(ori + j);
+	j += 1;
+	channelId = *(ori + j);
+	j += 1;
+	eventItem = *(ori + j);
+	j += 1;
+	memcpy(startTime, ori + j, 6);
+	j += 6;
+	memcpy(endTime, ori + j, 6);
+	j += 6;
+	delFlag = *(ori + j);
+	j += 1;
+
+	return j;
+}
+
+
+int RecordStartCmd::fromStream(BYTE *ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	cmd = *(ori + j);
+	j += 1;
+	time = ntohs(*(WORD *)(ori + j));
+	j += 2;
+	saveFlag = *(ori + j);
+	j += 1;
+	SampleRate = *(ori + j);
 	j += 1;
 
 	return j;
