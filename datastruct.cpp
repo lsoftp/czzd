@@ -1405,3 +1405,28 @@ int RecordStartCmd::fromStream(BYTE *ori)
 
 	return j;
 }
+
+int PlatformRsaPublicKey::fromStream(BYTE * ori)
+{
+	int j = 0;
+	j = header.fromStream(ori);
+	e = ntohl(*(DWORD*)(ori + j));
+	j += 4;
+	memcpy(n, ori + j, 128);
+	j += 128;
+
+	return j;
+}
+
+int TerminalRsaPublicKey::toStream(BYTE * ori)
+{
+	int j = 0;
+	j = header.toStream(ori);
+	DWORD dw = htonl(e);
+	memcpy(ori + j, &dw, 4);
+	j += 4;
+	memcpy(ori + j, n, 128);
+	j += 128;
+
+	return j;
+}

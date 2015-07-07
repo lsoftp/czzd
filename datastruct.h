@@ -71,24 +71,24 @@ public:
 	}
     int getDataFromBuf(unsigned char *buf, int *len)
     {
-        int j,begin = -1,end=-1;
+        int j , begin = -1,end = -1;
         if(size == 0)
         {
             *len = 0;
             return 0;
         }
 
-        for (j=0;j<size;j++)
+        for (j = 0; j < size; j++)
         {
             if (stream[j] == 0x7e)
             {
                 if(begin == -1)
                 {
-                    begin=j;
+                    begin = j;
                 }
                 else
                 {
-                    end=j;
+                    end = j;
                     break;
                 }
             }
@@ -1380,6 +1380,7 @@ public:
 	DWORD e;
 	BYTE n[128];
 
+	int fromStream(BYTE * ori);
 };
 
 class TerminalRsaPublicKey
@@ -1389,5 +1390,6 @@ public:
 	DWORD e;
 	BYTE n[128];
 
+	int toStream(BYTE * ori);
 };
 #endif /* DATASTRUCT_H_ */

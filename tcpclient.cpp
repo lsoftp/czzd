@@ -1,7 +1,7 @@
 
 #include "tcpclient.h"
 #include "datastruct.h"
-
+/*
 list<Msg> TcpClient::msgList;
 pthread_mutex_t TcpClient::mutex;
 list<RecvStream> TcpClient::recvStreamList;
@@ -16,13 +16,22 @@ int TcpClient::m_resendtimes = 3;
 int TcpClient::socket_fd;
 struct sockaddr_in TcpClient::server_addr;
 RecvBuf TcpClient::recvbuf;
-
+*/
 TcpClient::TcpClient()
 {  
 	pthread_mutex_init(&mutex,NULL);
 	pthread_mutex_init(&mutexRecvStream,NULL);
 	pthread_mutex_init(&mutexserialNumber,NULL);
-
+	pthread_cond_init(&condRecv,NULL); // = PTHREAD_COND_INITIALIZER;
+	m_serialNumber = 0;
+	m_timeout = 2500000;
+	m_resendtimes = 3;
+	m_phoneNumber[0] = 0x01;
+	m_phoneNumber[1] = 0x39;
+	m_phoneNumber[2] = 0x16;
+	m_phoneNumber[3] = 0x85;
+	m_phoneNumber[4] = 0x96;
+	m_phoneNumber[5] = 0x14;
 }  
 
 TcpClient::~TcpClient()
@@ -300,16 +309,26 @@ int  TcpClient::handleMsgList()
 
 	return 0;
 }
+void * TcpClient::sendRecvMsg(void * arg)
+{
+	   TcpClient *ptc = (TcpClient*)arg;
+	   return ptc->sendRecv(arg);
+}
 
+void * TcpClient::recvMsg(void * arg)
+{
+	   TcpClient *ptc = (TcpClient*)arg;
+	   return ptc->handleRecvMsg(arg);
+}
 
 int TcpClient::start()
 {
-    int ret = pthread_create(&sendRecvHandler, NULL, TcpClient::sendRecv, this);
+    int ret = pthread_create(&sendRecvHandler, NULL, TcpClient::sendRecvMsg, this);
     if(ret != 0)
     {
         return ret;
     }
-    ret = pthread_create(&recvHandler, NULL, TcpClient::handleRecvMsg, this);
+    ret = pthread_create(&recvHandler, NULL, TcpClient::recvMsg, this);
     if(ret != 0)
     {
         return ret;
@@ -339,10 +358,10 @@ int TcpClient::start()
 	r.plateNumber="abcde";
 
 	int len;
-	//printf("\nlen:%d   \n",len);
+
 	len = r.toStream(ori);
-	printf("\nlen:%d   \n",len);
-	//int l;
+
+
 	len = addCheckCode(ori,len);
 
 	toComposedMsg(ori,len, msg.stream, &(msg.len));
@@ -464,7 +483,7 @@ int TcpClient::toComposedMsg(unsigned char * original,int origlen, unsigned char
 		}
 		else
 		{
-		//printf("j=%d  tmplen= %d, start=%d\n", j, tmplen, start);		
+
 		    if(tmplen != 0)
 		    {
 		    	memcpy(composed+j, original+start, tmplen);
@@ -502,9 +521,9 @@ int TcpClient::toComposedMsg(unsigned char * original,int origlen, unsigned char
 int TcpClient::addCheckCode(unsigned char * original, int len)
 {
 	unsigned char c= 0x00;
-	for(int i = 0;i<len; i++)
+	for(int i = 0;i < len; i++)
 	{
-		c= c ^original[i];
+		c= c ^ original[i];
 	}
 	original[len] = c;
 	return len+1;
@@ -513,11 +532,11 @@ int TcpClient::addCheckCode(unsigned char * original, int len)
 int TcpClient::checkCode(unsigned char * original, int len)
 {
 	unsigned char c=0x00;
-	if(len<2)
+	if(len < 2)
 	{
 		return -2;
 	}
-	for(int i=0; i<len-1;i++)
+	for(int i=0; i < (len - 1);i++)
 	{
 		c = c^original[i];
 	}
